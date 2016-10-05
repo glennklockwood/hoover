@@ -3,6 +3,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <time.h>
 
 #include "hooverio.h"
@@ -58,7 +59,7 @@ int main(int argc, char **argv) {
     header = build_hoover_header( argv[1], hdo );
     if ( !header ) {
         fprintf( stderr, "got null header\n" );
-        hoover_free_hdo( hdo );
+        free_hdo( hdo );
         return 1;
     }
 
@@ -73,10 +74,10 @@ int main(int argc, char **argv) {
         header );
 
     /* Tear down everything */
-    free(header);
-    hoover_free_hdo( hdo );
+    free_hoover_header(header);
+    free_hdo(hdo);
 
-    destroy_hoover_tube(tube);
+    free_hoover_tube(tube);
 
     return 0;
 }

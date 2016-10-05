@@ -262,7 +262,7 @@ amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
 /*
  * Destroy amqp_table_t and all entries
  */
-void destroy_amqp_table( amqp_table_t *table ) {
+void free_amqp_table( amqp_table_t *table ) {
     int i;
     for ( i = 0; i < table->num_entries; i++ ) {
         free(&(table->entries[i]));
@@ -341,7 +341,7 @@ struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config) {
 
         if (tube->socket == NULL) {
             fprintf(stderr, "Failed to create socket!\n");
-            destroy_hoover_tube(tube);
+            free_hoover_tube(tube);
             return NULL;
         }
 
@@ -364,7 +364,7 @@ struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config) {
     /* make sure connection exists */
     if (!connected) {
         fprintf(stderr, "Failed to connect to any servers!\n");
-        destroy_hoover_tube(tube);
+        free_hoover_tube(tube);
         return NULL;
     }
 
@@ -380,7 +380,7 @@ struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config) {
         config->password);
 
     if ( parse_amqp_response(reply, "login", false) ) {
-        destroy_hoover_tube(tube);
+        free_hoover_tube(tube);
         return NULL;
     }
 
@@ -388,7 +388,7 @@ struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config) {
     tube->channel = 1;
     amqp_channel_open(tube->connection, tube->channel);
     if ( parse_amqp_response(amqp_get_rpc_reply(tube->connection), "channel open", false) ) {
-        destroy_hoover_tube(tube);
+        free_hoover_tube(tube);
         return NULL;
     }
 
@@ -404,14 +404,14 @@ struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config) {
         amqp_empty_table                          /* amqp_table_t arguments */
     );
     if ( parse_amqp_response(amqp_get_rpc_reply(tube->connection), "exchange declare", false) ) {
-        destroy_hoover_tube(tube);
+        free_hoover_tube(tube);
         return NULL;
     }
 
     return tube;
 }
 
-void destroy_hoover_tube( struct hoover_tube *tube ) {
+void free_hoover_tube( struct hoover_tube *tube ) {
     /* Closes all channels, notifies broker of shutdown, closes the socket, then
      * destroys the connection
      */
