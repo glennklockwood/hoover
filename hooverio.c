@@ -1,11 +1,15 @@
-/*  hooverio.c
+/*******************************************************************************
+ *  hooverio.c
  *
  *  Components of Hoover that are responsible for file I/O and processing data
  *  streams (compression, checksumming, etc)
- */
+ *
+ *  Glenn K. Lockwood, Lawrence Berkeley National Laboratory       October 2016
+ ******************************************************************************/
+
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <assert.h> /* for debugging */
 #include <zlib.h>
@@ -231,7 +235,7 @@ size_t hoover_write_hdo( FILE *fp, struct hoover_data_obj *hdo, size_t block_siz
 /* free memory associated with a hoover data object */
 void free_hdo( struct hoover_data_obj *hdo ) {
     if ( hdo == NULL ) {
-        fprintf( stderr, "free_hdo: received NULL hdo\n" );
+        fprintf( stderr, "free_hdo: received NULL pointer\n" );
     }
     else {
         free( hdo->data );
@@ -242,7 +246,7 @@ void free_hdo( struct hoover_data_obj *hdo ) {
 
 void free_hoover_header( struct hoover_header *header ) {
     if ( header == NULL )
-        fprintf( stderr, "free_hoover_header: received NULL header\n" );
+        fprintf( stderr, "free_hoover_header: received NULL pointer\n" );
     else
         free(header);
     return;

@@ -31,23 +31,24 @@ struct hoover_comm_config {
     int use_ssl;
 };
 
-/* each hoover_tube just aggregates a connection, a socket, a channel, and an
+/* Each hoover_tube just aggregates a connection, a socket, a channel, and an
    exchange into a single object for simplicity.  For simple message passing,
    we only need to define one of each to send messages. */
 struct hoover_tube {
     amqp_socket_t *socket;
     amqp_channel_t channel; /* I have no idea why channel passed around by value by rabbitmq-c */
     amqp_connection_state_t connection;
+    amqp_bytes_t exchange;
+    amqp_bytes_t routing_key;
 };
 
-
 struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config);
-void free_hoover_tube( struct hoover_tube *tube );
+void free_hoover_tube(struct hoover_tube *tube);
 
 struct hoover_comm_config *read_comm_config();
 void save_comm_config(struct hoover_comm_config *config, FILE *out);
+void free_comm_config(struct hoover_comm_config *config);
 
-void hoover_send_message( struct hoover_tube *tube,
-                   hoover_buffer *body, char *exchange, char *routing_key,
-                   struct hoover_header *header );
-
+void hoover_send_message(struct hoover_tube *tube,
+                         struct hoover_data_obj *hdo,
+                         struct hoover_header *header);

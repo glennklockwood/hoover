@@ -7,36 +7,26 @@
  *  Glenn K. Lockwood, Lawrence Berkeley National Laboratory       October 2016
  ******************************************************************************/
 
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
-#include <limits.h>
 #include <ctype.h>
-#include <signal.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <time.h>
 
 #include "hooverio.h"
 #include "hooverrmq.h"
 
-/* TODO: offer alternate options for systems not supporting SHA */
-#include <openssl/sha.h>
-
-#define SHA_DIGEST_LENGTH_HEX SHA_DIGEST_LENGTH * 2 + 1
-
 /*
- *  Function prototypes
+ *  Private functions
  */
 int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die);
 char *trim(char *string);
 char *select_server(struct hoover_comm_config *config);
 
 /*
- * Load RabbitMQ configuration parameters
+ *  Load RabbitMQ configuration parameters
  */
 struct hoover_comm_config *read_comm_config() {
     FILE *fp = fopen(HOOVER_CONFIG_FILE, "r");
@@ -49,6 +39,9 @@ struct hoover_comm_config *read_comm_config() {
     
     char *p = NULL;
     size_t ps = 0;
+
+    /* required by select_server */
+    srand(time(NULL) ^ getpid());
 
     while (!feof(fp) && !ferror(fp)) {
         size_t nread = getline(&p, &ps, fp);
@@ -68,25 +61,23 @@ struct hoover_comm_config *read_comm_config() {
             char *save_ptr = NULL;
             char *t_value = NULL;
             char *search = value;
-            size_t server_cnt = 0;
 
             while ((t_value = strtok_r(search, ",", &save_ptr)) != NULL) {
                 search = NULL;
                 t_value = trim(t_value);
                 if (t_value == NULL) continue;
 
-                if ( server_cnt < HOOVER_MAX_SERVERS ) {
-                    config->servers[server_cnt] = strdup(t_value);
-                    printf( "Found server %s\n", config->servers[server_cnt] );
-                    server_cnt++;
+                if ( config->max_hosts < HOOVER_MAX_SERVERS ) {
+                    config->servers[config->max_hosts] = strdup(t_value);
+                    printf( "Found server %s\n", config->servers[config->max_hosts] );
+                    config->max_hosts++;
                 }
                 else {
                     fprintf( stderr, "too many servers in config file; truncating at %d\n", HOOVER_MAX_SERVERS );
                     break;
                 }
             }
-            config->max_hosts = server_cnt;
-            config->remaining_hosts = server_cnt;
+            config->remaining_hosts = config->max_hosts;
         } else if (strcmp(key, "port") == 0) {
             config->port = atoi(value);
         } else if (strcmp(key, "vhost") == 0) {
@@ -260,51 +251,39 @@ amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
 
 
 /*
- * Destroy amqp_table_t and all entries
- */
-void free_amqp_table( amqp_table_t *table ) {
-    int i;
-    for ( i = 0; i < table->num_entries; i++ ) {
-        free(&(table->entries[i]));
-    }
-    free(table);
-    return;
-}
-
-
-/*
  * Convert a bunch of runtime structures into an AMQP message and send it
  */
 void hoover_send_message( struct hoover_tube *tube,
-                          hoover_buffer *body,
-                          char *exchange,
-                          char *routing_key,
+                          struct hoover_data_obj *hdo,
                           struct hoover_header *header ) {
     amqp_rpc_reply_t reply;
     amqp_basic_properties_t props;
     amqp_table_t *table;
+    amqp_bytes_t body;
 
-    memset( &props, 0, sizeof(props) );
+    /* convert HDO to amqp_bytes_t */
+    body.len = hdo->size;
+    body.bytes = hdo->data;
 
     /* create the amqp_table that contains the header metadata */
     table = create_amqp_header_table( header );
 
     /* TODO: figure out what these flags mean */
+    memset( &props, 0, sizeof(props) );
     props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG | AMQP_BASIC_HEADERS_FLAG;
     props.delivery_mode = 2; /* 1 or 2? */
     props.headers = *table;
 
     /* Send the actual AMQP message */
-    printf( "Sending message\n" );
     amqp_basic_publish(
-        tube->connection,                   /* amqp_connection_state_t state */
-        tube->channel,                      /* amqp_channel_t channel */
-        amqp_cstring_bytes(exchange),       /* amqp_bytes_t exchange */
-        amqp_cstring_bytes(routing_key),    /* amqp_bytes_t routing_key */
-        0,                                  /* amqp_boolean_t mandatory */
-        0,                                  /* amqp_boolean_t immediate */
-        &props,                             /* amqp_basic_properties_t properties */
-        *body                               /* amqp_bytes_t body */
+        tube->connection,   /* amqp_connection_state_t state */
+        tube->channel,      /* amqp_channel_t channel */
+        tube->exchange,     /* amqp_bytes_t exchange */
+        tube->routing_key,  /* amqp_bytes_t routing_key */
+        0,                  /* amqp_boolean_t mandatory */
+        0,                  /* amqp_boolean_t immediate */
+        &props,             /* amqp_basic_properties_t *properties */
+        body                /* amqp_bytes_t body */
     );
 
     /* no longer need the header table */
@@ -392,10 +371,15 @@ struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config) {
         return NULL;
     }
 
+    /* exchange/routing_key required to send messages, so include them in the
+     * tube */
+    tube->exchange = amqp_cstring_bytes(config->exchange);
+    tube->routing_key = amqp_cstring_bytes(config->routing_key);
+
     amqp_exchange_declare(
         tube->connection,                         /* amqp_connection_state_t state */
         tube->channel,                            /* amqp_channel_t channel */
-        amqp_cstring_bytes(config->exchange),     /* amqp_bytes_t exchange */
+        tube->exchange,                           /* amqp_bytes_t exchange */
         amqp_cstring_bytes(config->exchange_type),/* amqp_bytes_t type */
         0,                                        /* amqp_boolean_t passive */
         0,                                        /* amqp_boolean_t durable */
@@ -411,10 +395,62 @@ struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config) {
     return tube;
 }
 
+/*
+ * Destroy hoover_comm_config and free all strings
+ *
+ * Note that you MUST destroy all tubes that rely on a config before freeing
+ * that config with this function.  Tubes alias the 'exchange' and 'routing_key'
+ * members which are freed here.
+ */
+void free_comm_config( struct hoover_comm_config *config ) {
+    int i;
+    if (config == NULL) {
+        fprintf( stderr, "free_comm_config: received NULL pointer\n" );
+        return;
+    }
+
+    if (*config->servers != NULL)
+        for (i = 0; i < config->max_hosts; i++)
+            if (config->servers[i] != NULL)
+                free(config->servers[i]);
+
+    if (config->vhost         != NULL) free(config->vhost);
+    if (config->username      != NULL) free(config->username);
+    if (config->password      != NULL) free(config->password);
+    if (config->exchange      != NULL) free(config->exchange);    /* note that hoover_tube aliases this string */
+    if (config->exchange_type != NULL) free(config->exchange_type);
+    if (config->queue         != NULL) free(config->queue);
+    if (config->routing_key   != NULL) free(config->routing_key); /* note that hoover_tube aliases this string */
+
+    free(config);
+    return;
+}
+
+/*
+ * Destroy amqp_table_t and all entries
+ */
+void free_amqp_table( amqp_table_t *table ) {
+    int i;
+    for ( i = 0; i < table->num_entries; i++ )
+        free(&(table->entries[i]));
+    free(table);
+    return;
+}
+
+/*
+ * Destroy a hoover tube and all substructures.
+ *
+ * Note that semantics are a little different in that this function not only
+ * frees memory structures, but it also safely tears down communication with the
+ * RabbitMQ broker.
+ */
 void free_hoover_tube( struct hoover_tube *tube ) {
+    if ( tube == NULL ) {
+        fprintf( stderr, "free_hoover_tube: received NULL pointer\n" );
+        return;
+    }
     /* Closes all channels, notifies broker of shutdown, closes the socket, then
-     * destroys the connection
-     */
+     * destroys the connection */
     if ( tube->connection ) {
         parse_amqp_response(amqp_connection_close(tube->connection, AMQP_REPLY_SUCCESS), "connection close", false);
         amqp_destroy_connection(tube->connection);
