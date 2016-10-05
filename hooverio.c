@@ -91,7 +91,7 @@ int *finalize_block_states( struct block_state_structs *bss ) {
  * Read a file block by block, and pass these blocks through block-based
  * algorithms (hashing, compression, etc)
  */
-struct hoover_data_obj *hoover_load_file( FILE *fp, size_t block_size ) {
+struct hoover_data_obj *hoover_create_hdo( FILE *fp, size_t block_size ) {
     void *buf,
          *out_buf,
          *p_out;
@@ -207,26 +207,6 @@ struct hoover_data_obj *hoover_load_file( FILE *fp, size_t block_size ) {
     return hdo;
 }
 
-/* free memory associated with a hoover data object */
-void free_hdo( struct hoover_data_obj *hdo ) {
-    if ( hdo == NULL ) {
-        fprintf( stderr, "free_hdo: received NULL hdo\n" );
-    }
-    else {
-        free( hdo->data );
-        free( hdo );
-    }
-    return;
-}
-
-void free_hoover_header( struct hoover_header *header ) {
-    if ( header == NULL )
-        fprintf( stderr, "free_hoover_header: received NULL header\n" );
-    else
-        free(header);
-    return;
-}
-
 /*
  * Write a memory buffer to a file block by block
  */
@@ -246,6 +226,26 @@ size_t hoover_write_hdo( FILE *fp, struct hoover_data_obj *hdo, size_t block_siz
     } while ( bytes_left != 0 );
 
     return tot_bytes_written;
+}
+
+/* free memory associated with a hoover data object */
+void free_hdo( struct hoover_data_obj *hdo ) {
+    if ( hdo == NULL ) {
+        fprintf( stderr, "free_hdo: received NULL hdo\n" );
+    }
+    else {
+        free( hdo->data );
+        free( hdo );
+    }
+    return;
+}
+
+void free_hoover_header( struct hoover_header *header ) {
+    if ( header == NULL )
+        fprintf( stderr, "free_hoover_header: received NULL header\n" );
+    else
+        free(header);
+    return;
 }
 
 /*

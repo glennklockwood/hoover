@@ -33,7 +33,7 @@ int main( int argc, char **argv )
         return ENOENT;
     }
 
-    hdo = hoover_load_file( fp_in, HOOVER_BLK_SIZE );
+    hdo = hoover_create_hdo( fp_in, HOOVER_BLK_SIZE );
 
     fclose(fp_in);
 
@@ -46,7 +46,7 @@ int main( int argc, char **argv )
         free_hdo( hdo );
     }
     else {
-        fprintf(stderr, "hoover_load_file failed (errno=%d)\n", errno );
+        fprintf(stderr, "hoover_create_hdo failed (errno=%d)\n", errno );
         fclose(fp_out);
         return 1;
     }

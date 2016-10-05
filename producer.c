@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
         fprintf( stderr, "could not open file %s\n", argv[1] );
         return 1;
     }
-    hdo = hoover_load_file( fp, HOOVER_BLK_SIZE );
+    hdo = hoover_create_hdo( fp, HOOVER_BLK_SIZE );
 
     /* Build header */
     header = build_hoover_header( argv[1], hdo );

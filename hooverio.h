@@ -13,7 +13,7 @@
 
 /*
  * hoover_data_obj describes a file that has been loaded into memory through
- *   hoover_load_file().  If this were C++, it would be derived from
+ *   hoover_create_hdo().  If this were C++, it would be derived from
  *   amqp_bytes_t
  */
 struct hoover_data_obj {
@@ -34,7 +34,7 @@ struct hoover_header {
  * function prototypes
  */
 
-struct hoover_data_obj *hoover_load_file( FILE *fp, size_t block_size );
+struct hoover_data_obj *hoover_create_hdo( FILE *fp, size_t block_size );
 size_t hoover_write_hdo( FILE *fp, struct hoover_data_obj *hdo, size_t block_size );
 void free_hdo( struct hoover_data_obj *hdo );
 
