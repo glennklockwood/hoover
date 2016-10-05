@@ -7,11 +7,14 @@ OBJECTS=producer sha1 test-hooverio
 
 all: $(OBJECTS)
 
-producer: producer.c hooverio.o
-	$(CC) $(CPPFLAGS) -DHOOVER_CONFIG_FILE=\"amqpcreds.conf\" $(CFLAGS) -o $@ $^ $(LDFLAGS) -lrabbitmq  -lssl -lcrypto -lz
+producer: producer.c hooverio.o hooverrmq.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lrabbitmq -lssl -lcrypto -lz
 
 sha1: sha1.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $< $(LDFLAGS) -lssl -lcrypto
+
+hooverrmq.o: hooverrmq.c hooverrmq.h
+	$(CC) $(CPPFLAGS) -DHOOVER_CONFIG_FILE=\"amqpcreds.conf\"  $(CFLAGS) -c $<
 
 hooverio.o: hooverio.c hooverio.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<

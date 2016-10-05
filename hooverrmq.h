@@ -1,0 +1,55 @@
+#include <amqp_ssl_socket.h>
+#include <amqp_tcp_socket.h>
+#include <amqp_framing.h>
+
+#ifndef HOOVER_MAX_SERVERS
+#define HOOVER_MAX_SERVERS 256
+#endif
+
+#ifndef HOOVER_CONFIG_FILE
+#define HOOVER_CONFIG_FILE "/etc/opt/nersc/slurmd_log_rotate_mq.conf"
+#endif
+
+typedef amqp_bytes_t hoover_buffer;
+
+/*
+ * Global structures
+ */
+struct hoover_comm_config {
+    char *servers[HOOVER_MAX_SERVERS];
+    int max_hosts;
+    int remaining_hosts;
+    int port;
+    char *vhost;
+    char *username;
+    char *password;
+    char *exchange;
+    char *exchange_type;
+    char *queue;
+    char *routing_key;
+    size_t max_transmit_size;
+    int use_ssl;
+};
+
+/* each hoover_tube just aggregates a connection, a socket, a channel, and an
+   exchange into a single object for simplicity.  For simple message passing,
+   we only need to define one of each to send messages. */
+struct hoover_tube {
+    amqp_socket_t *socket;
+    amqp_channel_t channel; /* I have no idea why channel passed around by value by rabbitmq-c */
+    amqp_connection_state_t connection;
+};
+
+
+struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config);
+void destroy_hoover_tube( struct hoover_tube *tube );
+
+struct hoover_comm_config *read_config();
+void save_config(struct hoover_comm_config *config, FILE *out);
+
+struct hoover_header *build_header( char *filename, struct hoover_data_obj *hdo );
+
+void send_message(amqp_connection_state_t conn, amqp_channel_t channel,
+                  amqp_bytes_t *body, char *exchange, char *routing_key,
+                  struct hoover_header *header);
+
