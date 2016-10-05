@@ -1,3 +1,8 @@
+#ifdef __APPLE__
+#include <sys/syslimits.h>
+#define MAX_PATH PATH_MAX
+#endif
+
 #include <openssl/sha.h>
 #include <zlib.h>
 
@@ -20,6 +25,12 @@ struct hoover_data_obj {
     void *data;
 };
 
+struct hoover_header {
+    char filename[MAX_PATH];
+    size_t size;
+    unsigned char hash[SHA_DIGEST_LENGTH_HEX];
+};
+
 /*
  * function prototypes
  */
@@ -27,3 +38,4 @@ struct hoover_data_obj {
 void hoover_free_hdo( struct hoover_data_obj *hdo );
 size_t hoover_write_hdo( FILE *fp, struct hoover_data_obj *hdo, size_t block_size );
 struct hoover_data_obj *hoover_load_file( FILE *fp, size_t block_size );
+struct hoover_header *build_hoover_header( char *filename, struct hoover_data_obj *hdo );

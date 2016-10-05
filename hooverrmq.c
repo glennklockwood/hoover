@@ -1,9 +1,12 @@
 /*******************************************************************************
- *  This code is derived from rabbitmq_slurmdlog.c in CSG/nersc-slurm.git,
- *  written by D. M. Jacobsen.
+ *  hooverrmq.c
  *
- *  Glenn K. Lockwood, Lawrence Berkeley National Laboratory      September 2016
+ *  RabbitMQ interface to Hoover.  Portions of this code is derived from
+ *  rabbitmq_slurmdlog.c in CSG/nersc-slurm.git, written by D. M. Jacobsen.
+ *
+ *  Glenn K. Lockwood, Lawrence Berkeley National Laboratory       October 2016
  ******************************************************************************/
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,11 +20,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#ifdef __APPLE__
-#include <sys/syslimits.h>
-#define MAX_PATH PATH_MAX
-#endif
-
 #include "hooverio.h"
 #include "hooverrmq.h"
 
@@ -29,12 +27,6 @@
 #include <openssl/sha.h>
 
 #define SHA_DIGEST_LENGTH_HEX SHA_DIGEST_LENGTH * 2 + 1
-
-struct hoover_header {
-    char filename[MAX_PATH];
-    size_t size;
-    unsigned char hash[SHA_DIGEST_LENGTH_HEX];
-};
 
 /*
  *  Function prototypes
@@ -44,29 +36,9 @@ char *trim(char *string);
 char *select_server(struct hoover_comm_config *config);
 
 /*
- * Command-line and RabbitMQ configuration parameters
+ * Load RabbitMQ configuration parameters
  */
-void save_config(struct hoover_comm_config *config, FILE *out) {
-    if (config == NULL || out == NULL) return;
-
-    int i;
-    fprintf(out, "servers: ");
-    for ( i = 0 ; i < config->max_hosts; i++) {
-        fprintf(out, "%s%s", (i == 0 ? "" : ", "), config->servers[i] );
-    }
-    fprintf(out, "\nport: %d\n", config->port);
-    fprintf(out, "vhost: %s\n", config->vhost);
-    fprintf(out, "username: %s\n", config->username);
-    fprintf(out, "password: %s\n", config->password);
-    fprintf(out, "exchange: %s\n", config->exchange);
-    fprintf(out, "exchange_type: %s\n", config->exchange_type);
-    fprintf(out, "queue: %s\n", config->queue);
-    fprintf(out, "routing_key: %s\n", config->routing_key);
-    fprintf(out, "max_transmit_size: %lu\n", config->max_transmit_size);
-    fprintf(out, "use_ssl: %d\n", config->use_ssl);
-}
-
-struct hoover_comm_config *read_config() {
+struct hoover_comm_config *read_comm_config() {
     FILE *fp = fopen(HOOVER_CONFIG_FILE, "r");
     if (fp == NULL) return NULL;
 
@@ -142,6 +114,29 @@ struct hoover_comm_config *read_config() {
 }
 
 /*
+ * Save RabbitMQ configuration parameters
+ */
+void save_comm_config(struct hoover_comm_config *config, FILE *out) {
+    if (config == NULL || out == NULL) return;
+
+    int i;
+    fprintf(out, "servers: ");
+    for ( i = 0 ; i < config->max_hosts; i++) {
+        fprintf(out, "%s%s", (i == 0 ? "" : ", "), config->servers[i] );
+    }
+    fprintf(out, "\nport: %d\n", config->port);
+    fprintf(out, "vhost: %s\n", config->vhost);
+    fprintf(out, "username: %s\n", config->username);
+    fprintf(out, "password: %s\n", config->password);
+    fprintf(out, "exchange: %s\n", config->exchange);
+    fprintf(out, "exchange_type: %s\n", config->exchange_type);
+    fprintf(out, "queue: %s\n", config->queue);
+    fprintf(out, "routing_key: %s\n", config->routing_key);
+    fprintf(out, "max_transmit_size: %lu\n", config->max_transmit_size);
+    fprintf(out, "use_ssl: %d\n", config->use_ssl);
+}
+
+/*
  * Strip leading/trailing whitespace from a string
  */
 char *trim(char *string) {
@@ -209,7 +204,7 @@ int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die) {
 }
 
 /*
- *  randomly select a server from the list of servers, then pop it off the list
+ *  Randomly select a server from the list of servers, then pop it off the list
  */
 char *select_server(struct hoover_comm_config *config) {
     if (config->remaining_hosts == 0 || config->max_hosts == 0) return NULL;
@@ -229,17 +224,8 @@ char *select_server(struct hoover_comm_config *config) {
 }
 
 
-void destroy_amqp_table( amqp_table_t *table ) {
-    int i;
-    for ( i = 0; i < table->num_entries; i++ ) {
-        free(&(table->entries[i]));
-    }
-    free(table);
-    return;
-}
-
-/* create_amqp_header_table - convert a hoover_header struct into an AMQP table
- * to be attached to a message
+/* 
+ *  Convert a hoover_header into an AMQP table to be attached to a message
  */
 amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
     amqp_table_t *table;
@@ -272,10 +258,28 @@ amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
     return table;
 }
 
-/* convert a bunch of runtime structures into an AMQP message and send it  */
-void send_message( amqp_connection_state_t conn, amqp_channel_t channel,
-                   amqp_bytes_t *body, char *exchange, char *routing_key,
-                   struct hoover_header *header ) {
+
+/*
+ * Destroy amqp_table_t and all entries
+ */
+void destroy_amqp_table( amqp_table_t *table ) {
+    int i;
+    for ( i = 0; i < table->num_entries; i++ ) {
+        free(&(table->entries[i]));
+    }
+    free(table);
+    return;
+}
+
+
+/*
+ * Convert a bunch of runtime structures into an AMQP message and send it
+ */
+void hoover_send_message( struct hoover_tube *tube,
+                          hoover_buffer *body,
+                          char *exchange,
+                          char *routing_key,
+                          struct hoover_header *header ) {
     amqp_rpc_reply_t reply;
     amqp_basic_properties_t props;
     amqp_table_t *table;
@@ -293,8 +297,8 @@ void send_message( amqp_connection_state_t conn, amqp_channel_t channel,
     /* Send the actual AMQP message */
     printf( "Sending message\n" );
     amqp_basic_publish(
-        conn,                               /* amqp_connection_state_t state */
-        1,                                  /* amqp_channel_t channel */
+        tube->connection,                   /* amqp_connection_state_t state */
+        tube->channel,                      /* amqp_channel_t channel */
         amqp_cstring_bytes(exchange),       /* amqp_bytes_t exchange */
         amqp_cstring_bytes(routing_key),    /* amqp_bytes_t routing_key */
         0,                                  /* amqp_boolean_t mandatory */
@@ -307,42 +311,10 @@ void send_message( amqp_connection_state_t conn, amqp_channel_t channel,
     free(table->entries);
     free(table);
 
-    reply = amqp_get_rpc_reply(conn);
+    reply = amqp_get_rpc_reply(tube->connection);
     parse_amqp_response(reply, "publish message", true);
 
     return;
-}
-
-/*
- * input: list of file name strings
- * output: list of hoover headers...or just the json blob?  python version
- *         returns a dict which gets serialized later
- *
-struct hoover_header **build_manifest( char **filenames ) {
-}
- */
-
-/* generate the hoover_header struct from a file */
-struct hoover_header *build_header( char *filename, struct hoover_data_obj *hdo ) {
-    struct hoover_header *header;
-    struct stat st;
-
-    header = malloc(sizeof(struct hoover_header));
-    if ( !header )
-        return NULL;
-
-    strncpy( header->filename, filename, MAX_PATH );
-
-    header->size = hdo->size;
-
-    strncpy( (char*)header->hash, (const char*)hdo->hash, SHA_DIGEST_LENGTH_HEX );
-
-    printf( "file=[%s],size=[%ld],sha=[%s]\n",
-        header->filename,
-        header->size,
-        header->hash );
-
-    return header;
 }
 
 struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config) {

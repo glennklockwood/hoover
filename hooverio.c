@@ -241,3 +241,37 @@ size_t hoover_write_hdo( FILE *fp, struct hoover_data_obj *hdo, size_t block_siz
 
     return tot_bytes_written;
 }
+
+/*
+ * input: list of file name strings
+ * output: list of hoover headers...or just the json blob?  python version
+ *         returns a dict which gets serialized later
+ *
+struct hoover_header **build_manifest( char **filenames ) {
+}
+ */
+
+/*
+ * Generate the hoover_header struct from a file
+ */
+struct hoover_header *build_hoover_header( char *filename, struct hoover_data_obj *hdo ) {
+    struct hoover_header *header;
+    struct stat st;
+
+    header = malloc(sizeof(struct hoover_header));
+    if ( !header )
+        return NULL;
+
+    strncpy( header->filename, filename, MAX_PATH );
+
+    header->size = hdo->size;
+
+    strncpy( (char*)header->hash, (const char*)hdo->hash, SHA_DIGEST_LENGTH_HEX );
+
+    printf( "file=[%s],size=[%ld],sha=[%s]\n",
+        header->filename,
+        header->size,
+        header->hash );
+
+    return header;
+}

@@ -1,3 +1,6 @@
+/*
+ * Simple CLI interface to Hoover
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -20,12 +23,12 @@ int main(int argc, char **argv) {
     /*
      *  Initialize a bunch of nonsense
      */
-    if ( !(config = read_config()) ) {
+    if ( !(config = read_comm_config()) ) {
         fprintf( stderr, "NULL config\n" );
         return 1;
     }
     else {
-        save_config( config, stdout );
+        save_comm_config( config, stdout );
     }
     if ( argc < 2 ) {
         fprintf( stderr, "Syntax: %s <file name>\n", argv[0] );
@@ -52,7 +55,7 @@ int main(int argc, char **argv) {
     hdo = hoover_load_file( fp, HOOVER_BLK_SIZE );
 
     /* Build header */
-    header = build_header( argv[1], hdo );
+    header = build_hoover_header( argv[1], hdo );
     if ( !header ) {
         fprintf( stderr, "got null header\n" );
         hoover_free_hdo( hdo );
@@ -62,9 +65,8 @@ int main(int argc, char **argv) {
     /* Send the message */
     message.len = hdo->size;
     message.bytes = hdo->data;
-    send_message( 
-        tube->connection, 
-        1,
+    hoover_send_message( 
+        tube,
         &message,
         config->exchange,
         config->routing_key,

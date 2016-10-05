@@ -44,12 +44,10 @@ struct hoover_tube {
 struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config);
 void destroy_hoover_tube( struct hoover_tube *tube );
 
-struct hoover_comm_config *read_config();
-void save_config(struct hoover_comm_config *config, FILE *out);
+struct hoover_comm_config *read_comm_config();
+void save_comm_config(struct hoover_comm_config *config, FILE *out);
 
-struct hoover_header *build_header( char *filename, struct hoover_data_obj *hdo );
-
-void send_message(amqp_connection_state_t conn, amqp_channel_t channel,
-                  amqp_bytes_t *body, char *exchange, char *routing_key,
-                  struct hoover_header *header);
+void hoover_send_message( struct hoover_tube *tube,
+                   hoover_buffer *body, char *exchange, char *routing_key,
+                   struct hoover_header *header );
 
