@@ -253,11 +253,12 @@ void free_hoover_header( struct hoover_header *header ) {
 }
 
 /*
- * input: list of file name strings
- * output: list of hoover headers...or just the json blob?  python version
- *         returns a dict which gets serialized later
+ * Generate the contents of a manifest file based on generated headers
  *
-struct hoover_header **build_manifest( char **filenames ) {
+ * input: list of hoover_headers
+ * output: serialized list of hoover_headers (i.e., a json blob)
+ *
+char *build_manifest( struct hoover_header *headers ) {
 }
  */
 
@@ -286,6 +287,10 @@ struct hoover_header *build_hoover_header( char *filename, struct hoover_data_ob
     return header;
 }
 
+/*
+ * Serialized representation of a header.  Currently implemented as poor-man's
+ * JSON encoder.
+ */
 char *serialize_header(struct hoover_header *header) {
     size_t len;
     char *buf;
