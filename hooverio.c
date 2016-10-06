@@ -255,12 +255,48 @@ void free_hoover_header( struct hoover_header *header ) {
 /*
  * Generate the contents of a manifest file based on generated headers
  *
- * input: list of hoover_headers
+ * input: list of hoover headers
  * output: serialized list of hoover_headers (i.e., a json blob)
  *
-char *build_manifest( struct hoover_header *headers ) {
-}
+ * Caveats:
+ *   1. This is poor-man's JSON encoding.  I am not proud of it.
+ *   2. We use very naive and inefficient memory management here--if
+ *      performance is ever critical, this needs to be rewritten.
  */
+char *build_manifest( struct hoover_header **hoover_headers, int num_headers ) {
+    int i;
+    char *buf;
+    char *manifest = NULL;
+    const char *manifest_head = "[",
+               *manifest_tail = "]",
+               *manifest_join = ",";
+    /* nomenclature:  _len = product of strlen (no terminal \0 included)
+                     _size = number of bytes (must include terminal \0) */
+    size_t manifest_join_len = strlen(manifest_join);
+    size_t manifest_size, record_len;
+
+
+    /* initialize manifest */
+    manifest_size = sizeof(*manifest) * (strlen(manifest_head) + strlen(manifest_tail) + 1);
+    manifest = malloc(manifest_size);
+    strcpy( manifest, manifest_head );
+
+    /* add each header */
+    for (i = 0; i < num_headers; i++) {
+        buf = serialize_header(hoover_headers[i]);
+        /* the manifest_join_len is not necessary for i = 0, but whatever */
+        manifest_size += strlen(buf) + manifest_join_len;
+        manifest = realloc(manifest, manifest_size);
+
+        if (i > 0) {
+            strcat(manifest, manifest_join);
+        }
+        strcat(manifest, buf);
+        free(buf);
+    }
+    strcat( manifest, manifest_tail );
+    return manifest;
+}
 
 /*
  * Generate the hoover_header struct from a file
@@ -270,19 +306,16 @@ struct hoover_header *build_hoover_header( char *filename, struct hoover_data_ob
     struct stat st;
     char *serialized;
 
-    header = malloc(sizeof(struct hoover_header));
+    header = malloc(sizeof(*header));
     if ( !header )
         return NULL;
+    memset(header,0,sizeof(*header));
 
     strncpy( header->filename, filename, MAX_PATH );
 
     header->size = hdo->size;
 
     strncpy( (char*)header->sha_hash, (const char*)hdo->hash, SHA_DIGEST_LENGTH_HEX );
-
-    serialized = serialize_header(header);
-    printf("%s", serialized);
-    if ( serialized ) free(serialized);
 
     return header;
 }
@@ -311,6 +344,12 @@ char *serialize_header(struct hoover_header *header) {
         header->compress,
         header->sha_hash,
         header->size );
+/*  printf( "serialize_header: trimming from %ld to %ld (strlen=%ld)\n",
+        sizeof(*header)+24,
+        sizeof(*buf) * strlen(buf) + 1,
+        strlen(buf) );
+        */
+    buf = realloc(buf, sizeof(*buf) * strlen(buf) + 1);
 
     return buf;
 }

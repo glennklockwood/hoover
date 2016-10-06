@@ -1,6 +1,6 @@
-processfile
 producer
-test-hooverio
+test-hdo
+test-header
 *.dSYM
 *.o
 *.pyc

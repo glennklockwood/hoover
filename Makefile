@@ -3,7 +3,7 @@
 CFLAGS=-I/opt/local/include -Wno-deprecated-declarations -g
 LDFLAGS=-L/opt/local/lib -Bstatic
 
-OBJECTS=producer test-hooverio
+OBJECTS=producer test-hdo test-manifest
 
 all: $(OBJECTS)
 
@@ -16,7 +16,10 @@ hooverrmq.o: hooverrmq.c hooverrmq.h
 hooverio.o: hooverio.c hooverio.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
 
-test-hooverio: test-hooverio.c hooverio.o
+test-hdo: test-hdo.c hooverio.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto -lz
+
+test-manifest: test-manifest.c hooverio.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto -lz
 
 clean:

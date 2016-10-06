@@ -5,16 +5,16 @@ do
     echo "====== Trying block size of $bs ======"
     dd if=/dev/random of=$bs bs=$bs count=1 2>/dev/null
 
-    ./processfile $bs $bs.hz.gz 2>&1 | grep SHA > tmp.txt
+    ./test-hdo $bs $bs.hz.gz 2>&1 | grep hash > tmp.txt
 
     if [ ! -s "$bs.hz.gz" ]; then
-        echo "processfile broke and returned a zero-sized file" >&2
+        echo "test-hdo broke and returned a zero-sized file" >&2
         rm "$bs.hz.gz" $bs
         continue
     fi
 
-    result_comp=$(awk '/SHA1 compressed/ { print $4 }' tmp.txt)
-    result_uncomp=$(awk '/SHA1 uncompressed/ { print $4 }' tmp.txt)
+    result_comp=$(awk '/^Saved hash:/ { print $3 }' tmp.txt)
+    result_uncomp=$(awk '/^Original hash:/ { print $3 }' tmp.txt)
     actual_comp=$(shasum $bs.hz.gz | awk '{print $1}')
     actual_uncomp=$(gunzip -c $bs.hz.gz | shasum | awk '{print $1}')
 

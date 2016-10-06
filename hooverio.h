@@ -47,3 +47,5 @@ void free_hdo( struct hoover_data_obj *hdo );
 struct hoover_header *build_hoover_header( char *filename, struct hoover_data_obj *hdo );
 void free_hoover_header( struct hoover_header *header );
 char *serialize_header(struct hoover_header *header);
+
+char *build_manifest( struct hoover_header **hoover_headers, int num_headers );

@@ -1,7 +1,6 @@
 /*
- * wrapper to test basic file encoding features of hooverio
+ * Test block encoding components of HDO generation
  */
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -19,17 +18,13 @@ int main( int argc, char **argv )
         return 1;
     }
     else if ( argc < 3 )
-        fp_out = stdout;
+        fp_out = NULL;
     else
         fp_out = fopen( argv[2], "w" );
     fp_in = fopen( argv[1], "r" );
 
     if ( !fp_in ) {
         fprintf( stderr, "Could not open input file %s\n", argv[1] );
-        return ENOENT;
-    }
-    else if ( !fp_out ) {
-        fprintf( stderr, "Could not open output file %s\n", ( argc < 3 ? "stdout" : argv[2] ) );
         return ENOENT;
     }
 
@@ -42,16 +37,16 @@ int main( int argc, char **argv )
         printf( "Original hash: %s\n",        hdo->hash_orig );
         printf( "Saving:        %ld bytes\n", hdo->size );
         printf( "Saved hash:    %s\n",        hdo->hash );
-        hoover_write_hdo( fp_out, hdo, HOOVER_BLK_SIZE );
+        if (fp_out) hoover_write_hdo( fp_out, hdo, HOOVER_BLK_SIZE );
         free_hdo( hdo );
     }
     else {
         fprintf(stderr, "hoover_create_hdo failed (errno=%d)\n", errno );
-        fclose(fp_out);
+        if (fp_out) fclose(fp_out);
         return 1;
     }
 
-    fclose(fp_out);
+    if (fp_out) fclose(fp_out);
 
     return 0;
 }
