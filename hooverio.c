@@ -267,6 +267,7 @@ struct hoover_header **build_manifest( char **filenames ) {
 struct hoover_header *build_hoover_header( char *filename, struct hoover_data_obj *hdo ) {
     struct hoover_header *header;
     struct stat st;
+    char *serialized;
 
     header = malloc(sizeof(struct hoover_header));
     if ( !header )
@@ -276,12 +277,35 @@ struct hoover_header *build_hoover_header( char *filename, struct hoover_data_ob
 
     header->size = hdo->size;
 
-    strncpy( (char*)header->hash, (const char*)hdo->hash, SHA_DIGEST_LENGTH_HEX );
+    strncpy( (char*)header->sha_hash, (const char*)hdo->hash, SHA_DIGEST_LENGTH_HEX );
 
-    printf( "file=[%s],size=[%ld],sha=[%s]\n",
-        header->filename,
-        header->size,
-        header->hash );
+    serialized = serialize_header(header);
+    printf("%s", serialized);
+    if ( serialized ) free(serialized);
 
     return header;
+}
+
+char *serialize_header(struct hoover_header *header) {
+    size_t len;
+    char *buf;
+
+    const char *template = "{ \"filename\": \"%s\", \"node_id\": \"%s\", \"task_id\": \"%s\", \"compression\": \"%s\", \"sha1sum\": \"%s\", \"size\": %ld }";
+
+    /* assume header is mostly fixed-size characters */
+    /* +24 chars = string representation up to a yottabyte */
+    len = sizeof(*header)+24;
+
+    if (!(buf = malloc(len)))
+        return NULL;
+
+    snprintf( buf, len, template,
+        header->filename,
+        header->node_id,
+        header->task_uuid,
+        header->compress,
+        header->sha_hash,
+        header->size );
+
+    return buf;
 }

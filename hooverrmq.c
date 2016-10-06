@@ -201,13 +201,15 @@ char *select_server(struct hoover_comm_config *config) {
     if (config->remaining_hosts == 0 || config->max_hosts == 0) return NULL;
 
     size_t idx;
-    char *server;
+    char *server, *tmp;
 
     idx = rand() % config->max_hosts;
     server = config->servers[idx];
 
     /* swap last element with selected element */
+    tmp = config->servers[idx];
     config->servers[idx] = config->servers[config->remaining_hosts - 1];
+    config->servers[config->remaining_hosts - 1] = tmp;
 
     /* shorten the candidate list so we don't try the same server twice */
     config->remaining_hosts--;
@@ -242,7 +244,7 @@ amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
 
     entries[2].key = amqp_cstring_bytes("checksum");
     entries[2].value.kind = AMQP_FIELD_KIND_UTF8;
-    entries[2].value.value.bytes = amqp_cstring_bytes((char*)header->hash);
+    entries[2].value.value.bytes = amqp_cstring_bytes((char*)header->sha_hash);
 
     table->entries = entries;
 
@@ -409,10 +411,9 @@ void free_comm_config( struct hoover_comm_config *config ) {
         return;
     }
 
-    if (*config->servers != NULL)
-        for (i = 0; i < config->max_hosts; i++)
-            if (config->servers[i] != NULL)
-                free(config->servers[i]);
+    for (i = 0; i < config->max_hosts; i++)
+        if (config->servers[i] != NULL)
+            free(config->servers[i]);
 
     if (config->vhost         != NULL) free(config->vhost);
     if (config->username      != NULL) free(config->username);
