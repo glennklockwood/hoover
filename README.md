@@ -10,17 +10,10 @@ here:
 
 https://sites.google.com/a/lbl.gov/glennklockwood/nersc-infrastructure/rabbitmq
 
-This directory also contains a git submodule to my fork of the amqptools repo.
-To get the submodule, either pass the `-r` flag to `git clone`, or clone this
-repo and then do
+This infrastructure has been created as a part of the [TOKIO project][], funded
+by the U.S. Department of Energy Office of Science's Advanced Scientific
+Computing Research program under the Storage Systems and I/O project.  **This
+software is not licensed for distribution.  Contact its author if you would
+like a license to use any part of this software.**
 
-    git submodule init
-    git submodule update
-
-The C consumer can be activated via
-
-    AMQP_QUEUE=logs ./amqpspawn 'darshanlogs' '' -h localhost --foreground
-
-where we are binding a queue called `logs` to the `darshanlogs` exchange with
-a null (`''`) routing key.  This null routing key in the context of `amqpspawn`
-is only used as an argument to the callback executable.
+[TOKIO project]: https://www.nersc.gov/research-and-development/tokio/
