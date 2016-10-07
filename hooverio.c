@@ -355,7 +355,10 @@ char *serialize_header(struct hoover_header *header) {
 }
 
 /*
- *  Convert a serialized manifest to an HDO so it can be sent over the wire
+ *  Convert a serialized manifest to an HDO so it can be sent over the wire.
+ *
+ *  Note that manifest_size should not include the terminal NULL character, as
+ *  we do not want that that appearing in the HDO payload.
  */
 struct hoover_data_obj *manifest_to_hdo( char *manifest, size_t manifest_size ) {
     /* Copy the manifest into a temporary file since hoover_create_hdo operates
@@ -364,7 +367,7 @@ struct hoover_data_obj *manifest_to_hdo( char *manifest, size_t manifest_size ) 
      * macOS)
      */
     FILE *fp = tmpfile();
-    size_t bytes_left = manifest_size - 1; /* don't include terminal \0 in output */
+    size_t bytes_left = manifest_size;
     char *p = manifest;
     do {
         size_t write_size;

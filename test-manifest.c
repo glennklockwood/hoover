@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
 
     /* Now convert manifest into an HDO */
     FILE *fp_out = fopen( "manifest.json.gz", "w" );
-    hdo = manifest_to_hdo( manifest, strlen(manifest)+1 );
+    hdo = manifest_to_hdo( manifest, strlen(manifest) );
     if ( hdo != NULL ) {
         printf( "Loaded:        %ld bytes\n", hdo->size_orig );
         printf( "Original hash: %s\n",        hdo->hash_orig );
