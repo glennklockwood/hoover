@@ -35,15 +35,15 @@ int main(int argc, char **argv) {
     }
 
     char **filenames = &argv[1];
-    uint8_t num_files = argc - 1;
-    uint8_t num_headers = 0;
+    uint32_t num_files = argc - 1;
+    uint32_t num_headers = 0;
     struct hoover_header **headers = malloc(sizeof(struct hoover_header) * num_files);
     memset(headers, 0, sizeof(struct hoover_header) * num_files);
     if ( !headers ) {
         fprintf( stderr, "couldn't allocate memory for headers\n" );
         return 1;
     }
-    for ( uint8_t i = 0; i < num_files; i++ ) {
+    for ( uint32_t i = 0; i < num_files; i++ ) {
         FILE *fp;
         if ( !(fp = fopen(filenames[i], "r")) ) {
             fprintf( stderr, "could not open file %s\n", filenames[i] );
@@ -67,6 +67,7 @@ int main(int argc, char **argv) {
         }
 
         /* Send the message */
+        printf("Sending %s\n", filenames[i]);
         hoover_send_message( tube, hdo, header );
 
         /* Release the HDO, but retain the header to build the manifest */
@@ -102,7 +103,7 @@ int main(int argc, char **argv) {
     free(manifest_fn);
     free_hoover_header(manifest_header);
     free_hdo(manifest_hdo);
-    for (uint8_t i = 0; i < num_files; i++)
+    for (uint32_t i = 0; i < num_files; i++)
         free_hoover_header(headers[i]);
     free(headers);
 
