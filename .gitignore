@@ -1,6 +1,6 @@
 producer
 test-hdo
-test-header
+test-manifest
 *.dSYM
 *.o
 *.pyc
