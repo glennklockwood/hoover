@@ -49,3 +49,4 @@ void free_hoover_header( struct hoover_header *header );
 char *serialize_header(struct hoover_header *header);
 
 char *build_manifest( struct hoover_header **hoover_headers, int num_headers );
+struct hoover_data_obj *manifest_to_hdo( char *manifest, size_t manifest_size );

@@ -353,3 +353,46 @@ char *serialize_header(struct hoover_header *header) {
 
     return buf;
 }
+
+/*
+ *  Convert a serialized manifest to an HDO so it can be sent over the wire
+ */
+struct hoover_data_obj *manifest_to_hdo( char *manifest, size_t manifest_size ) {
+    /* Copy the manifest into a temporary file since hoover_create_hdo operates
+     * on FILE pointers.  On POSIX2008 systems we can use fmemopen(3) or
+     * open_memstream(3), but these aren't available on all systems (notably,
+     * macOS)
+     */
+    FILE *fp = tmpfile();
+    size_t bytes_left = manifest_size;
+    char *p = manifest;
+    do {
+        size_t write_size;
+        if ( bytes_left > HOOVER_BLK_SIZE )
+            write_size = HOOVER_BLK_SIZE;
+        else
+            write_size = bytes_left;
+        size_t bytes_written = fwrite( p, 1, write_size, fp );
+        if ( bytes_written != write_size ) {
+            perror("manifest_to_hoover: unable to write out manifest");
+            return NULL;
+        }
+        else {
+            /* there is redundant state being tracked here, but this is easy */
+            p += bytes_written;
+            bytes_left -= bytes_written;
+        }
+    } while ( bytes_left != 0 );
+
+    /* Create the HDO from the file we just populated */
+    if (fseek(fp, 0, SEEK_SET) != 0) {
+        perror("manifest_to_hoover: unable to rewind manifest file");
+        return NULL;
+    }
+    struct hoover_data_obj *hdo = hoover_create_hdo( fp, HOOVER_BLK_SIZE );
+
+    /* This close automatically unlinks the file due to tmpfile */
+    fclose(fp);
+
+    return hdo;
+}
