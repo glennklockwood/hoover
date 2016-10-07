@@ -25,7 +25,7 @@ def begin_consume( host, exchange, output_dir, port=pika.connection.ConnectionPa
         `output_dir` being in scope, so we define this callback within the
         consumer function
         """
-        if properties.headers is None or 'checksum' not in properties.headers:
+        if properties.headers is None or 'sha_hash' not in properties.headers:
             ### Messages without checksums at all are useless to us; discard
             print("No checksum provided in message header")
             print("Message header = [%s]" % json.dumps(properties.headers))
@@ -34,7 +34,7 @@ def begin_consume( host, exchange, output_dir, port=pika.connection.ConnectionPa
             ### No filename with checksum indicates a manifest being sent.
             ### Key manifests their expected contents so that if a manifest
             ### has to be re-sent, it is not duplicated on the consumer side
-            output_file = os.path.basename('manifest_%s.json' % properties.headers['checksum'])
+            output_file = os.path.basename('manifest_%s.json' % properties.headers['sha_hash'])
         else:
             ### Actual files have intended file names embedded
             output_file = os.path.basename(properties.headers['filename'])
@@ -46,11 +46,11 @@ def begin_consume( host, exchange, output_dir, port=pika.connection.ConnectionPa
 
         ### Calculate checksum and compare to manifest
         checksum = hoover.checksum( StringIO.StringIO(body) )
-        if checksum == properties.headers['checksum']:
+        if checksum == properties.headers['sha_hash']:
             print("Wrote output to %s (cksum: %s)" % (output_file, checksum)) 
         else:
             print("Checksum mismatch for %s (cksum: %s, was expecting %s)" % 
-                (output_file, checksum, properties.headers['checksum']))
+                (output_file, checksum, properties.headers['sha_hash']))
 
     conn = pika.BlockingConnection( pika.ConnectionParameters( host=host, port=port ) )
 
