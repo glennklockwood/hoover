@@ -3,6 +3,8 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <string.h> /* for hdo stuff */
 
 #include "hooverio.h"
 
@@ -25,7 +27,6 @@ int main(int argc, char **argv) {
         fprintf( stderr, "Syntax: %s <file name> [file name [file name [...]]]\n", argv[0] );
         return 1;
     }
-
     num_files = argc - 1;
     headers = malloc(sizeof(*headers) * num_files);
     for ( i = 0; i < num_files; i++ ) {
@@ -54,6 +55,24 @@ int main(int argc, char **argv) {
     for ( i = 0; i < num_files; i++ )
         free(headers[i]);
     free(headers);
+
+    /* Now convert manifest into an HDO */
+    FILE *fp_out = fopen( "manifest.json.gz", "w" );
+    hdo = manifest_to_hdo( manifest, strlen(manifest)+1 );
+    if ( hdo != NULL ) {
+        printf( "Loaded:        %ld bytes\n", hdo->size_orig );
+        printf( "Original hash: %s\n",        hdo->hash_orig );
+        printf( "Saving:        %ld bytes\n", hdo->size );
+        printf( "Saved hash:    %s\n",        hdo->hash );
+        if (fp_out) hoover_write_hdo( fp_out, hdo, HOOVER_BLK_SIZE );
+        free_hdo( hdo );
+    }
+    else {
+        fprintf(stderr, "hoover_create_hdo failed (errno=%d)\n", errno );
+        if (fp_out) fclose(fp_out);
+        return 1;
+    }
+    if (fp_out) fclose(fp_out);
 
     return 0;
 }
