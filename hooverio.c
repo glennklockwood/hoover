@@ -364,7 +364,7 @@ struct hoover_data_obj *manifest_to_hdo( char *manifest, size_t manifest_size ) 
      * macOS)
      */
     FILE *fp = tmpfile();
-    size_t bytes_left = manifest_size;
+    size_t bytes_left = manifest_size - 1; /* don't include terminal \0 in output */
     char *p = manifest;
     do {
         size_t write_size;
