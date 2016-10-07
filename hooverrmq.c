@@ -220,31 +220,44 @@ char *select_server(struct hoover_comm_config *config) {
 /* 
  *  Convert a hoover_header into an AMQP table to be attached to a message
  */
+#define HOOVER_HEADER_ENTRIES 6 /* number of elements in struct hoover_header */
 amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
     amqp_table_t *table;
     amqp_table_entry_t *entries;
 
     if ( !(table = malloc(sizeof(*table))) )
         return NULL;
-    if ( !(entries = malloc(3 * sizeof(*entries))) ) {
+    if ( !(entries = malloc(HOOVER_HEADER_ENTRIES * sizeof(*entries))) ) {
         free(table);
         return NULL;
     }
 
-    table->num_entries = 3;
+    table->num_entries = HOOVER_HEADER_ENTRIES;
 
     /* Set headers */
     entries[0].key = amqp_cstring_bytes("filename");
     entries[0].value.kind = AMQP_FIELD_KIND_UTF8;
     entries[0].value.value.bytes = amqp_cstring_bytes(header->filename);
 
-    entries[1].key = amqp_cstring_bytes("size");
-    entries[1].value.kind = AMQP_FIELD_KIND_I64;
-    entries[1].value.value.i64 = header->size;
+    entries[1].key = amqp_cstring_bytes("node_id");
+    entries[1].value.kind = AMQP_FIELD_KIND_UTF8;
+    entries[1].value.value.bytes = amqp_cstring_bytes(header->node_id);
 
-    entries[2].key = amqp_cstring_bytes("checksum");
+    entries[2].key = amqp_cstring_bytes("task_id");
     entries[2].value.kind = AMQP_FIELD_KIND_UTF8;
-    entries[2].value.value.bytes = amqp_cstring_bytes((char*)header->sha_hash);
+    entries[2].value.value.bytes = amqp_cstring_bytes(header->task_id);
+
+    entries[3].key = amqp_cstring_bytes("compression");
+    entries[3].value.kind = AMQP_FIELD_KIND_UTF8;
+    entries[3].value.value.bytes = amqp_cstring_bytes(header->compression);
+
+    entries[4].key = amqp_cstring_bytes("sha_hash");
+    entries[4].value.kind = AMQP_FIELD_KIND_UTF8;
+    entries[4].value.value.bytes = amqp_cstring_bytes((char*)header->sha_hash);
+
+    entries[5].key = amqp_cstring_bytes("size");
+    entries[5].value.kind = AMQP_FIELD_KIND_I64;
+    entries[5].value.value.i64 = header->size;
 
     table->entries = entries;
 

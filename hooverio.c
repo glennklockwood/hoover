@@ -31,6 +31,7 @@ struct block_state_structs {
     SHA_CTX sha_stream;
     SHA_CTX sha_stream_compressed;
     z_stream z_stream; 
+    char compression[COMPRESS_FIELD_LEN];
     unsigned char sha_hash[SHA_DIGEST_LENGTH];
     unsigned char sha_hash_compressed[SHA_DIGEST_LENGTH];
     char sha_hash_hex[SHA_DIGEST_LENGTH_HEX];
@@ -64,12 +65,13 @@ struct block_state_structs *init_block_states( void ) {
             &(bss->z_stream),
             Z_DEFAULT_COMPRESSION,
             Z_DEFLATED,
-            15 + 16, /* 15 is default for deflateInit, +32 enables gzip */
+            15 + 16, /* 15 is default for deflateInit, +16 enables gzip */
             8,
             Z_DEFAULT_STRATEGY)) != Z_OK ) {
         free(bss);
         return NULL;
     }
+    strncpy(bss->compression, "gz", COMPRESS_FIELD_LEN);
 
     return bss;
 }
@@ -204,6 +206,7 @@ struct hoover_data_obj *hoover_create_hdo( FILE *fp, size_t block_size ) {
     hdo->size = tot_bytes_written;
     hdo->data = realloc( out_buf, tot_bytes_written );
     hdo->size_orig = tot_bytes_read;
+    strncpy(hdo->compression, bss->compression, COMPRESS_FIELD_LEN);
 
     /* clean up */
     free(buf);
@@ -311,13 +314,62 @@ struct hoover_header *build_hoover_header( char *filename, struct hoover_data_ob
         return NULL;
     memset(header,0,sizeof(*header));
 
-    strncpy( header->filename, filename, MAX_PATH );
-
+    /*
+     * header->filename
+     * header->node_id
+     * header->task_id
+     * header->compress
+     * header->sha_hash
+     * header->size
+     */
+    strncpy(header->filename, filename, MAX_PATH);
+    get_hoover_node_id(header->node_id, HOST_NAME_MAX);
+    get_hoover_task_id(header->task_id, TASK_ID_LEN);
+    strncpy(header->compression, hdo->compression, COMPRESS_FIELD_LEN);
+    strncpy((char*)header->sha_hash, (const char*)hdo->hash, SHA_DIGEST_LENGTH_HEX);
     header->size = hdo->size;
 
-    strncpy( (char*)header->sha_hash, (const char*)hdo->hash, SHA_DIGEST_LENGTH_HEX );
+    /* if compressed, append the compression suffix to the transmitted file
+       name.  this keeps the consumer from having to explicitly know anything
+       about the HDO payload */
+    if ( header->compression[0] != '\0' ) {
+        strncat(header->filename, ".", MAX_PATH);
+        strncat(header->filename, header->compression, MAX_PATH);
+    }
 
     return header;
+}
+
+/*
+ *  Get a unique node identifier for this host; used in Hoover headers
+ */
+int get_hoover_node_id( char *name, size_t len ) {
+    return gethostname( name, len );
+}
+
+/*
+ *  Get a unique task identifier for this invocation of Hoover
+ */
+int get_hoover_task_id( char *name, size_t len ) {
+    char *jobid, *taskid;
+    jobid = getenv(HOOVER_JOB_ID_VAR);
+    taskid = getenv(HOOVER_TASK_ID_VAR);
+    int written;
+
+    if (!jobid && !taskid) {
+        written = snprintf(name, len, "%d", getpid());
+    }
+    else if (!jobid) {
+        written = snprintf(name, len, "0-%s", taskid);
+    }
+    else if (!taskid) {
+        written = snprintf(name, len, "%s-0", jobid);
+    }
+    else {
+        written = snprintf( name, len, "%s-%s", jobid, taskid );
+    }
+
+    return !(len == written);
 }
 
 /*
@@ -340,8 +392,8 @@ char *serialize_header(struct hoover_header *header) {
     snprintf( buf, len, template,
         header->filename,
         header->node_id,
-        header->task_uuid,
-        header->compress,
+        header->task_id,
+        header->compression,
         header->sha_hash,
         header->size );
 /*  printf( "serialize_header: trimming from %ld to %ld (strlen=%ld)\n",
