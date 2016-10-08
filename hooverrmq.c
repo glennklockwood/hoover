@@ -6,7 +6,9 @@
  *
  *  Glenn K. Lockwood, Lawrence Berkeley National Laboratory       October 2016
  ******************************************************************************/
-
+#if !defined(_XOPEN_SOURCE) || _XOPEN_SOURCE < 700
+    #define _XOPEN_SOURCE 700
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>

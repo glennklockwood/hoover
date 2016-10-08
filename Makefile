@@ -1,7 +1,10 @@
 .PHONY: clean
 
-CFLAGS=-I/opt/local/include -Wno-deprecated-declarations -g
-LDFLAGS=-L/opt/local/lib -Bstatic
+RMQ_C_DIR=$(PWD)/rabbitmq-c-0.8.0/_install
+OTHER_PKGS_DIR=/opt/local
+
+CFLAGS=-I$(RMQ_C_DIR)/include -I$(OTHER_PKGS_DIR)/include -Wno-deprecated-declarations -g -std=c99
+LDFLAGS=-L$(RMQ_C_DIR)/lib -L$(OTHER_PKGS_DIR)/lib -Bstatic
 
 OBJECTS=producer test-hdo test-manifest
 

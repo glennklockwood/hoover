@@ -1,9 +1,13 @@
+#ifndef __USE_POSIX
+    #define __USE_POSIX
+#endif
 #include <limits.h>
 
 #ifdef __APPLE__
     #include <sys/syslimits.h>
-    #define MAX_PATH PATH_MAX
     #define HOST_NAME_MAX _POSIX_HOST_NAME_MAX
+#elif __linux__
+    #include <linux/limits.h>
 #endif
 
 #include <openssl/sha.h>
@@ -41,7 +45,7 @@ struct hoover_data_obj {
  * and build_hoover_header
  */
 struct hoover_header {
-    char filename[MAX_PATH];
+    char filename[PATH_MAX];
     char node_id[HOST_NAME_MAX];
     char task_id[TASK_ID_LEN];
     char compression[COMPRESS_FIELD_LEN];

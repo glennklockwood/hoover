@@ -7,9 +7,13 @@
  *  Glenn K. Lockwood, Lawrence Berkeley National Laboratory       October 2016
  ******************************************************************************/
 
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 600 /* for gethostname in unistd.h */
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <assert.h> /* for debugging */
 #include <zlib.h>
@@ -322,7 +326,7 @@ struct hoover_header *build_hoover_header( char *filename, struct hoover_data_ob
      * header->sha_hash
      * header->size
      */
-    strncpy(header->filename, filename, MAX_PATH);
+    strncpy(header->filename, filename, PATH_MAX);
     get_hoover_node_id(header->node_id, HOST_NAME_MAX);
     get_hoover_task_id(header->task_id, TASK_ID_LEN);
     strncpy(header->compression, hdo->compression, COMPRESS_FIELD_LEN);
@@ -333,8 +337,8 @@ struct hoover_header *build_hoover_header( char *filename, struct hoover_data_ob
        name.  this keeps the consumer from having to explicitly know anything
        about the HDO payload */
     if ( header->compression[0] != '\0' ) {
-        strncat(header->filename, ".", MAX_PATH);
-        strncat(header->filename, header->compression, MAX_PATH);
+        strncat(header->filename, ".", PATH_MAX);
+        strncat(header->filename, header->compression, PATH_MAX);
     }
 
     return header;
