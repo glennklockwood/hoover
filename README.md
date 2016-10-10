@@ -16,4 +16,19 @@ Computing Research program under the Storage Systems and I/O project.  **This
 software is not licensed for distribution.  Contact its author if you would
 like a license to use any part of this software.**
 
+Installation
+--------------------------------------------------------------------------------
+Hoover relies on [rabbitmq-c][] library, openssl, and libz.  To compile
+rabbitmq-c, download the package, untar it, cd into the untarred directory, then
+
+    libtoolize
+    autoreconf -i
+    ./configure --prefix=$PWD/_install --enable-static
+    make install
+
+Then edit the Hoover Makefile and set `RMQ_C_DIR` appropriately.  You may also
+want to set `OTHER_PKGS_DIR` to reflect the location where libssl and libz are
+installed.
+
 [TOKIO project]: https://www.nersc.gov/research-and-development/tokio/
+[rabbitmq-c]: https://github.com/alanxz/rabbitmq-c
