@@ -25,19 +25,19 @@
  */
 int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die);
 char *trim(char *string);
-char *select_server(struct hoover_comm_config *config);
+char *select_server(struct hoover_tube_config *config);
 
 /*
  *  Load RabbitMQ configuration parameters
  */
-struct hoover_comm_config *read_comm_config() {
+struct hoover_tube_config *read_tube_config() {
     FILE *fp = fopen(HOOVER_CONFIG_FILE, "r");
     if (fp == NULL) return NULL;
 
-    struct hoover_comm_config *config = (struct hoover_comm_config *) malloc(sizeof(struct hoover_comm_config));
+    struct hoover_tube_config *config = (struct hoover_tube_config *) malloc(sizeof(struct hoover_tube_config));
     if ( !config ) return NULL;
 
-    memset(config, 0, sizeof(struct hoover_comm_config));
+    memset(config, 0, sizeof(struct hoover_tube_config));
     
     char *p = NULL;
     size_t ps = 0;
@@ -109,7 +109,7 @@ struct hoover_comm_config *read_comm_config() {
 /*
  * Save RabbitMQ configuration parameters
  */
-void save_comm_config(struct hoover_comm_config *config, FILE *out) {
+void save_tube_config(struct hoover_tube_config *config, FILE *out) {
     if (config == NULL || out == NULL) return;
 
     int i;
@@ -199,7 +199,7 @@ int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die) {
 /*
  *  Randomly select a server from the list of servers, then pop it off the list
  */
-char *select_server(struct hoover_comm_config *config) {
+char *select_server(struct hoover_tube_config *config) {
     if (config->remaining_hosts == 0 || config->max_hosts == 0) return NULL;
 
     size_t idx;
@@ -313,7 +313,7 @@ void hoover_send_message( struct hoover_tube *tube,
     return;
 }
 
-struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config) {
+struct hoover_tube *create_hoover_tube(struct hoover_tube_config *config) {
     int connected, status;
     char *hostname;
     struct hoover_tube *tube;
@@ -413,16 +413,16 @@ struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config) {
 }
 
 /*
- * Destroy hoover_comm_config and free all strings
+ * Destroy hoover_tube_config and free all strings
  *
  * Note that you MUST destroy all tubes that rely on a config before freeing
  * that config with this function.  Tubes alias the 'exchange' and 'routing_key'
  * members which are freed here.
  */
-void free_comm_config( struct hoover_comm_config *config ) {
+void free_tube_config( struct hoover_tube_config *config ) {
     int i;
     if (config == NULL) {
-        fprintf( stderr, "free_comm_config: received NULL pointer\n" );
+        fprintf( stderr, "free_tube_config: received NULL pointer\n" );
         return;
     }
 

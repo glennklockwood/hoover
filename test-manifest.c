@@ -11,7 +11,7 @@
 int main(int argc, char **argv) {
     FILE *fp;
 
-    struct hoover_comm_config *config;
+    struct hoover_tube_config *config;
     struct hoover_header *header;
     struct hoover_data_obj *hdo;
     struct hoover_tube *tube;

@@ -15,7 +15,7 @@ typedef amqp_bytes_t hoover_buffer;
 /*
  * Global structures
  */
-struct hoover_comm_config {
+struct hoover_tube_config {
     char *servers[HOOVER_MAX_SERVERS];
     int max_hosts;
     int remaining_hosts;
@@ -42,12 +42,12 @@ struct hoover_tube {
     amqp_bytes_t routing_key;
 };
 
-struct hoover_tube *create_hoover_tube(struct hoover_comm_config *config);
+struct hoover_tube *create_hoover_tube(struct hoover_tube_config *config);
 void free_hoover_tube(struct hoover_tube *tube);
 
-struct hoover_comm_config *read_comm_config();
-void save_comm_config(struct hoover_comm_config *config, FILE *out);
-void free_comm_config(struct hoover_comm_config *config);
+struct hoover_tube_config *read_tube_config();
+void save_tube_config(struct hoover_tube_config *config, FILE *out);
+void free_tube_config(struct hoover_tube_config *config);
 
 void hoover_send_message(struct hoover_tube *tube,
                          struct hoover_data_obj *hdo,
