@@ -1,4 +1,5 @@
 producer
+producer-file
 test-hdo
 test-manifest
 *.dSYM

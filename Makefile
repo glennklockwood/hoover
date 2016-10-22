@@ -6,7 +6,7 @@ OTHER_PKGS_DIR=/opt/local
 CFLAGS=-I$(RMQ_C_DIR)/include -I$(OTHER_PKGS_DIR)/include -Wno-deprecated-declarations -g -std=c99
 LDFLAGS=-L$(RMQ_C_DIR)/lib -L$(OTHER_PKGS_DIR)/lib -Bstatic
 
-OBJECTS=producer test-hdo test-manifest
+OBJECTS=producer producer-file test-hdo test-manifest
 
 all: $(OBJECTS)
 
@@ -15,6 +15,12 @@ producer: producer.c hooverio.o hooverrmq.o
 
 hooverrmq.o: hooverrmq.c hooverrmq.h
 	$(CC) $(CPPFLAGS) -DHOOVER_CONFIG_FILE=\"amqpcreds.conf\"  $(CFLAGS) -c $<
+
+producer-file: producer.c hooverio.o hooverfile.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto -lz
+
+hooverfile.o: hooverfile.c hooverfile.h
+	$(CC) $(CPPFLAGS)  $(CFLAGS) -c $<
 
 hooverio.o: hooverio.c hooverio.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<

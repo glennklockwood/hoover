@@ -14,8 +14,19 @@
 #include "hooverio.h"
 #include "hooverrmq.h"
 
+uint32_t delete_files( char **filenames, uint32_t num_files ) {
+    uint32_t errors = 0;
+    for (uint32_t i = 0; i < num_files; i++) {
+        int32_t ret = unlink( filenames[i] );
+        if (ret != 0)
+            perror("delete_files: unlink returned error");
+        errors++;
+    }
+    return errors;
+}
+
 int main(int argc, char **argv) {
-    struct hoover_comm_config *config;
+    struct hoover_tube_config *config;
     struct hoover_tube *tube;
 
     if ( argc < 2 ) {
@@ -24,12 +35,12 @@ int main(int argc, char **argv) {
     }
 
     /* Load the tube configuration  */
-    if ( !(config = read_comm_config()) ) {
+    if ( !(config = read_tube_config()) ) {
         fprintf( stderr, "NULL config\n" );
         return 1;
     }
     else {
-        save_comm_config( config, stdout );
+        save_tube_config( config, stdout );
     }
 
     /* Set up the tube (AMQP connection, socket, exchange, and channel) */
@@ -80,6 +91,12 @@ int main(int argc, char **argv) {
         headers[num_headers++] = header;
     }
 
+    /* 
+     * destroy files after they have been transferred
+     *
+    delete_files(filenames, num_files);
+    */
+
     /* build the manifest */
     char *manifest = build_manifest(headers, num_files);
 
@@ -117,7 +134,7 @@ int main(int argc, char **argv) {
 
     /* tear down communication structures */
     free_hoover_tube(tube);
-    free_comm_config(config);
+    free_tube_config(config);
 
     return 0;
 }
