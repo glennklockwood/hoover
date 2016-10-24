@@ -218,27 +218,6 @@ struct hoover_data_obj *hoover_create_hdo( FILE *fp, size_t block_size ) {
     return hdo;
 }
 
-/*
- * Write a memory buffer to a file block by block
- */
-size_t hoover_write_hdo( FILE *fp, struct hoover_data_obj *hdo, size_t block_size ) {
-    void *p_out = hdo->data;
-    size_t bytes_written,
-           tot_bytes_written = 0,
-           bytes_left = hdo->size;
-    do {
-        if ( bytes_left > block_size )
-            bytes_written = fwrite( p_out, 1, block_size, fp );
-        else
-            bytes_written = fwrite( p_out, 1, bytes_left, fp );
-        p_out = (char*)p_out + bytes_written;
-        tot_bytes_written += bytes_written;
-        bytes_left = hdo->size - tot_bytes_written;
-    } while ( bytes_left != 0 );
-
-    return tot_bytes_written;
-}
-
 /* free memory associated with a hoover data object */
 void free_hdo( struct hoover_data_obj *hdo ) {
     if ( hdo == NULL ) {

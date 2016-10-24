@@ -5,7 +5,11 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/stat.h>
+
 #include "hooverio.h"
+
+/* from hooverfile.o */
+extern size_t hoover_write_hdo( FILE *fp, struct hoover_data_obj *hdo, size_t block_size );
 
 int main( int argc, char **argv )
 {

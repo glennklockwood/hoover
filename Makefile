@@ -25,10 +25,10 @@ hooverfile.o: hooverfile.c hooverfile.h
 hooverio.o: hooverio.c hooverio.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
 
-test-hdo: test-hdo.c hooverio.o
+test-hdo: test-hdo.c hooverio.o hooverfile.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto -lz
 
-test-manifest: test-manifest.c hooverio.o
+test-manifest: test-manifest.c hooverio.o hooverfile.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto -lz
 
 clean:

@@ -1,5 +1,5 @@
 /*******************************************************************************
- *  hooverrmq.c
+ *  hooverfile.c
  *
  *  File-based tube interface to Hoover.
  *
@@ -20,6 +20,32 @@
 #include "hooverio.h"
 #include "hooverfile.h"
 
+/*******************************************************************************
+ * Local functions
+ ******************************************************************************/
+
+/* Write a memory buffer to a file block by block */
+size_t hoover_write_hdo( FILE *fp, struct hoover_data_obj *hdo, size_t block_size ) {
+    void *p_out = hdo->data;
+    size_t bytes_written,
+           tot_bytes_written = 0,
+           bytes_left = hdo->size;
+    do {
+        if ( bytes_left > block_size )
+            bytes_written = fwrite( p_out, 1, block_size, fp );
+        else
+            bytes_written = fwrite( p_out, 1, bytes_left, fp );
+        p_out = (char*)p_out + bytes_written;
+        tot_bytes_written += bytes_written;
+        bytes_left = hdo->size - tot_bytes_written;
+    } while ( bytes_left != 0 );
+
+    return tot_bytes_written;
+}
+
+/*
+ * Global functions
+ */
 struct hoover_tube_config *read_tube_config(void) {
     struct hoover_tube_config *config;
     config = calloc(1, sizeof(struct hoover_tube_config));
@@ -27,6 +53,7 @@ struct hoover_tube_config *read_tube_config(void) {
     return config;
 }
 void save_tube_config(struct hoover_tube_config *config, FILE *out) {
+    fprintf( out, "%s\n", config->dir );
     return;
 }
 void free_tube_config(struct hoover_tube_config *config) {
@@ -38,9 +65,6 @@ void free_tube_config(struct hoover_tube_config *config) {
     return;
 }
 
-/*
- * Convert a bunch of runtime structures into an AMQP message and send it
- */
 void hoover_send_message( struct hoover_tube *tube,
                           struct hoover_data_obj *hdo,
                           struct hoover_header *header ) {
