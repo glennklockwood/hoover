@@ -10,8 +10,6 @@
 #define HOOVER_CONFIG_FILE "/etc/opt/nersc/slurmd_log_rotate_mq.conf"
 #endif
 
-typedef amqp_bytes_t hoover_buffer;
-
 /*
  * Global structures
  */

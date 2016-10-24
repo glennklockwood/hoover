@@ -26,6 +26,8 @@
 int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die);
 char *trim(char *string);
 char *select_server(struct hoover_tube_config *config);
+amqp_table_t *create_amqp_header_table( struct hoover_header *header );
+void free_amqp_header_table( amqp_table_t *table );
 
 /*
  *  Load RabbitMQ configuration parameters
@@ -303,9 +305,7 @@ void hoover_send_message( struct hoover_tube *tube,
         body                /* amqp_bytes_t body */
     );
 
-    /* no longer need the header table */
-    free(table->entries);
-    free(table);
+    free_amqp_header_table(table);
 
     reply = amqp_get_rpc_reply(tube->connection);
     parse_amqp_response(reply, "publish message", true);
@@ -445,7 +445,7 @@ void free_tube_config( struct hoover_tube_config *config ) {
 /*
  * Destroy amqp_table_t and all entries
  */
-void free_amqp_table( amqp_table_t *table ) {
+void free_amqp_header_table( amqp_table_t *table ) {
     int i;
     for ( i = 0; i < table->num_entries; i++ )
         free(&(table->entries[i]));
