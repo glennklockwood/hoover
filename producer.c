@@ -25,6 +25,44 @@ uint32_t delete_files( char **filenames, uint32_t num_files ) {
     return errors;
 }
 
+/* does str end with suffix? */
+uint16_t endswith(const char *str, const char *suffix) {
+    if ( !str || !suffix )
+        return 0;
+    
+    size_t len_str = strlen(str),
+           len_suffix = strlen(suffix);
+
+    if (len_suffix > len_str) return 0;
+
+    return strncmp(str + len_str - len_suffix, suffix, len_suffix) == 0;
+}
+
+/* does str start with prefix? */
+#define startswith(str, prefix) (strncmp((str), (prefix), strlen((prefix))) == 0)
+
+/* not thread safe */
+char *infer_hdo_type( char *filename ) {
+    static char type[HDO_TYPE_FIELD_LEN];
+    if ( !filename ) {
+        type[0] = '\0';
+        return type;
+    }
+    else if (endswith(filename, ".darshan.gz")
+         ||  endswith(filename, ".darshan")) {
+        strncpy(type, "darshan", HDO_TYPE_FIELD_LEN);
+    }
+    else if (startswith(filename, "manifest_") 
+         && (endswith(filename, ".json") || endswith(filename, ".gz")) ) {
+        strncpy(type, "manifest", HDO_TYPE_FIELD_LEN);
+    }
+    else {
+        type[0] = '\0';
+    }
+   
+    return type;
+}
+
 int main(int argc, char **argv) {
     struct hoover_tube_config *config;
     struct hoover_tube *tube;
@@ -75,7 +113,7 @@ int main(int argc, char **argv) {
         }
 
         /* Build header for HDO */
-        struct hoover_header *header = build_hoover_header( filenames[i], hdo, "darshan" );
+        struct hoover_header *header = build_hoover_header( filenames[i], hdo, infer_hdo_type(filenames[i]) );
         if ( !header ) {
             fprintf( stderr, "got NULL header from %s\n", filenames[i] );
             free_hdo( hdo );

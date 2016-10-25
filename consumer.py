@@ -13,10 +13,16 @@ import hoover
 import argparse
 import StringIO
 
-_HOOVER_EXCHANGE = 'darshanlogs'
-_HOOVER_OUTPUT_DIR = os.path.join(os.getcwd(), "out")
-_HOOVER_LOG_QUEUE = 'logs'
 _DEFAULT_VERBOSITY = 'INFO'
+
+_HOOVER_EXCHANGE = 'darshanlogs'
+_HOOVER_LOG_QUEUE = 'logs'
+
+_HOOVER_OUTPUT_DIRS = {
+    "darshan":  "darshanlogs",
+    "manifest": "manifests",
+    "_default": "misc",
+}
 
 def begin_consume( host, exchange, output_dir, port=pika.connection.ConnectionParameters.DEFAULT_PORT ):
     def receive_message( channel, method, properties, body ):
@@ -25,6 +31,7 @@ def begin_consume( host, exchange, output_dir, port=pika.connection.ConnectionPa
         `output_dir` being in scope, so we define this callback within the
         consumer function
         """
+        ### Figure out what to call this file
         if properties.headers is None or 'sha_hash' not in properties.headers:
             ### Messages without checksums at all are useless to us; discard
             print("No checksum provided in message header")
@@ -38,7 +45,26 @@ def begin_consume( host, exchange, output_dir, port=pika.connection.ConnectionPa
         else:
             ### Actual files have intended file names embedded
             output_file = os.path.basename(properties.headers['filename'])
-        output_file = os.path.join(output_dir, output_file)
+
+        ### Figure out where to put this file.  If the global config is an
+        ### absolute path, we use that and disregard output_dir entirely;
+        ### otherwise, we take output_dir as a base then tack on the globally
+        ### configured dir
+        if 'type' not in properties.headers:
+            parent_dir = ""
+        elif properties.headers['type'] not in _HOOVER_OUTPUT_DIRS:
+            parent_dir = _HOOVER_OUTPUT_DIRS['_default']
+        else:
+            parent_dir = _HOOVER_OUTPUT_DIRS[properties.headers['type']]
+
+        if not parent_dir.startswith(os.sep):
+            parent_dir = os.path.join(output_dir, parent_dir)
+
+        if not os.path.isdir(parent_dir):
+            print("Creating output dir [%s]" % parent_dir)
+            os.makedirs(parent_dir)
+
+        output_file = os.path.join(parent_dir, output_file)
 
         ### Write the message body into the intended file
         with open( output_file, 'w+' ) as fp:
@@ -51,6 +77,8 @@ def begin_consume( host, exchange, output_dir, port=pika.connection.ConnectionPa
         else:
             print("Checksum mismatch for %s (cksum: %s, was expecting %s)" % 
                 (output_file, checksum, properties.headers['sha_hash']))
+
+#       print("Header was %s" % json.dumps(properties.headers))
 
     conn = pika.BlockingConnection( pika.ConnectionParameters( host=host, port=port ) )
 
@@ -76,7 +104,7 @@ if __name__ == '__main__':
                         help="name of exchange to consume")
     parser.add_argument("-o", "--output",
                         type=str,
-                        default=_HOOVER_OUTPUT_DIR,
+                        default=os.getcwd(),
                         help="output directory")
     parser.add_argument("-h", "--host",
                         type=str,
