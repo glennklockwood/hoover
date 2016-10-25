@@ -30,5 +30,16 @@ Then edit the Hoover Makefile and set `RMQ_C_DIR` appropriately.  You may also
 want to set `OTHER_PKGS_DIR` to reflect the location where libssl and libz are
 installed.
 
+Development
+--------------------------------------------------------------------------------
+
+### Adding new header fields
+
+1. Add new field to `struct hoover_header` defined in `hooverio.h`
+2. Update `build_hoover_header` and `serialize_header` in `hooverio.c` to
+   populate and serialize the new field
+3. Modify the header converter function in each hoover output plugin (e.g.,
+   `create_amqp_header_table` in `hooverrmq.c`) to send the new field
+
 [TOKIO project]: https://www.nersc.gov/research-and-development/tokio/
 [rabbitmq-c]: https://github.com/alanxz/rabbitmq-c

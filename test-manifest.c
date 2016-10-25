@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
         hdo = hoover_create_hdo( fp, HOOVER_BLK_SIZE );
 
         /* Build header */
-        headers[i] = build_hoover_header( argv[i+1], hdo );
+        headers[i] = build_hoover_header( argv[i+1], hdo, "" );
         if ( !headers[i] ) {
             fprintf( stderr, "got null header\n" );
             return 1;

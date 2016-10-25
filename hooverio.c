@@ -287,7 +287,7 @@ char *build_manifest( struct hoover_header **hoover_headers, int num_headers ) {
 /*
  * Generate the hoover_header struct from a file
  */
-struct hoover_header *build_hoover_header( char *filename, struct hoover_data_obj *hdo ) {
+struct hoover_header *build_hoover_header( char *filename, struct hoover_data_obj *hdo, char *filetype ) {
     struct hoover_header *header;
     struct stat st;
     char *serialized;
@@ -303,6 +303,7 @@ struct hoover_header *build_hoover_header( char *filename, struct hoover_data_ob
      * header->task_id
      * header->compress
      * header->sha_hash
+     * header->type
      * header->size
      */
     strncpy(header->filename, filename, PATH_MAX);
@@ -311,6 +312,7 @@ struct hoover_header *build_hoover_header( char *filename, struct hoover_data_ob
     strncpy(header->compression, hdo->compression, COMPRESS_FIELD_LEN);
     strncpy((char*)header->sha_hash, (const char*)hdo->hash, SHA_DIGEST_LENGTH_HEX);
     header->size = hdo->size;
+    strncpy(header->type, filetype, HDO_TYPE_FIELD_LEN);
 
     /* if compressed, append the compression suffix to the transmitted file
        name.  this keeps the consumer from having to explicitly know anything
@@ -363,7 +365,7 @@ char *serialize_header(struct hoover_header *header) {
     size_t len;
     char *buf;
 
-    const char *template = "{ \"filename\": \"%s\", \"node_id\": \"%s\", \"task_id\": \"%s\", \"compression\": \"%s\", \"sha1sum\": \"%s\", \"size\": %ld }";
+    const char *template = "{ \"filename\": \"%s\", \"node_id\": \"%s\", \"task_id\": \"%s\", \"compression\": \"%s\", \"sha1sum\": \"%s\", \"size\": %ld, \"type\": \"%s\" }";
 
     /* assume header is mostly fixed-size characters */
     /* +24 chars = string representation up to a yottabyte */
@@ -378,7 +380,8 @@ char *serialize_header(struct hoover_header *header) {
         header->task_id,
         header->compression,
         header->sha_hash,
-        header->size );
+        header->size,
+        header->type );
 /*  printf( "serialize_header: trimming from %ld to %ld (strlen=%ld)\n",
         sizeof(*header)+24,
         sizeof(*buf) * strlen(buf) + 1,

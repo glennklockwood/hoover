@@ -26,6 +26,7 @@
 #define SHA_DIGEST_LENGTH_HEX (SHA_DIGEST_LENGTH * 2 + 1)
 #define COMPRESS_FIELD_LEN 8
 #define TASK_ID_LEN 64
+#define HDO_TYPE_FIELD_LEN 64
 
 /*
  * hoover_data_obj describes a file that has been loaded into memory through
@@ -33,24 +34,25 @@
  *   amqp_bytes_t
  */
 struct hoover_data_obj {
-    void *data;
-    size_t size;
-    char hash[SHA_DIGEST_LENGTH_HEX];
-    char hash_orig[SHA_DIGEST_LENGTH_HEX];
-    size_t size_orig;
-    char compression[COMPRESS_FIELD_LEN];
+    void *data;                            /* data payload of HDO */
+    size_t size;                           /* size of *data */
+    size_t size_orig;                      /* size of original data */
+    char hash[SHA_DIGEST_LENGTH_HEX];      /* checksum of the 'data' field */
+    char hash_orig[SHA_DIGEST_LENGTH_HEX]; /* checksum of original data */
+    char compression[COMPRESS_FIELD_LEN];  /* compression applied to 'data' field (e.g., "gz") */
 };
 
 /* when adding new header entries, you must also modify create_amqp_header_table
  * and build_hoover_header
  */
 struct hoover_header {
-    char filename[PATH_MAX];
-    char node_id[HOST_NAME_MAX];
-    char task_id[TASK_ID_LEN];
-    char compression[COMPRESS_FIELD_LEN];
-    unsigned char sha_hash[SHA_DIGEST_LENGTH_HEX];
-    size_t size;
+    char filename[PATH_MAX];               /* suggested file name for the HDO */
+    char node_id[HOST_NAME_MAX];           /* uniquely describes the system that generated this HDO */
+    char task_id[TASK_ID_LEN];             /* uniquely describes all HDOs associated with the output of a single parallel task */
+    char compression[COMPRESS_FIELD_LEN];  /* compression algorithm applied to HDO data payload (e.g., "gz") */
+    char type[HDO_TYPE_FIELD_LEN];         /* arb. string describing type; can be used downstream */
+    unsigned char sha_hash[SHA_DIGEST_LENGTH_HEX]; /* checksum of the HDO's data */
+    size_t size;                           /* size of *data */
 };
 
 /*
@@ -60,7 +62,7 @@ struct hoover_data_obj *hoover_create_hdo( FILE *fp, size_t block_size );
 size_t hoover_write_hdo( FILE *fp, struct hoover_data_obj *hdo, size_t block_size );
 void free_hdo( struct hoover_data_obj *hdo );
 
-struct hoover_header *build_hoover_header( char *filename, struct hoover_data_obj *hdo );
+struct hoover_header *build_hoover_header( char *filename, struct hoover_data_obj *hdo, char *filetype );
 void free_hoover_header( struct hoover_header *header );
 char *serialize_header(struct hoover_header *header);
 

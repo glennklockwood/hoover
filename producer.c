@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
         }
 
         /* Build header for HDO */
-        struct hoover_header *header = build_hoover_header( filenames[i], hdo );
+        struct hoover_header *header = build_hoover_header( filenames[i], hdo, "darshan" );
         if ( !header ) {
             fprintf( stderr, "got NULL header from %s\n", filenames[i] );
             free_hdo( hdo );
@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
     }
 
     /* then build the manifest HDO's header */
-    struct hoover_header *manifest_header = build_hoover_header(manifest_fn, manifest_hdo);
+    struct hoover_header *manifest_header = build_hoover_header(manifest_fn, manifest_hdo, "manifest");
 
     /* send the manifest HDO as the final piece */
     hoover_send_message( tube, manifest_hdo, manifest_header );

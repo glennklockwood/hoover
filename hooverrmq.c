@@ -121,7 +121,7 @@ static int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die)
 /**
  *  Convert a hoover_header into an AMQP table to be attached to a message
  */
-#define HOOVER_HEADER_ENTRIES 6 /* number of elements in struct hoover_header */
+#define HOOVER_HEADER_ENTRIES 7 /* number of elements in struct hoover_header */
 static amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
     amqp_table_t *table;
     amqp_table_entry_t *entries;
@@ -159,6 +159,10 @@ static amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
     entries[5].key = amqp_cstring_bytes("size");
     entries[5].value.kind = AMQP_FIELD_KIND_I64;
     entries[5].value.value.i64 = header->size;
+
+    entries[6].key = amqp_cstring_bytes("type");
+    entries[6].value.kind = AMQP_FIELD_KIND_UTF8;
+    entries[6].value.value.bytes = amqp_cstring_bytes((char*)header->type);
 
     table->entries = entries;
 
