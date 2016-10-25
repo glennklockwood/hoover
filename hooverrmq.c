@@ -20,19 +20,170 @@
 #include "hooverio.h"
 #include "hooverrmq.h"
 
-/*
+/*******************************************************************************
  *  Private functions
- */
-int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die);
-char *trim(char *string);
-char *select_server(struct hoover_tube_config *config);
-amqp_table_t *create_amqp_header_table( struct hoover_header *header );
-void free_amqp_header_table( amqp_table_t *table );
+ ******************************************************************************/
+static int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die);
+static char *trim(char *string);
+static char *select_server(struct hoover_tube_config *config);
+static amqp_table_t *create_amqp_header_table( struct hoover_header *header );
+static void free_amqp_header_table( amqp_table_t *table );
 
-/*
+/**
+ *  Randomly select a server from the list of servers, then pop it off the list
+ */
+char *select_server(struct hoover_tube_config *config) {
+    if (config->remaining_hosts == 0 || config->max_hosts == 0) return NULL;
+
+    size_t idx;
+    char *server, *tmp;
+
+    idx = rand() % config->max_hosts;
+    server = config->servers[idx];
+
+    /* swap last element with selected element */
+    tmp = config->servers[idx];
+    config->servers[idx] = config->servers[config->remaining_hosts - 1];
+    config->servers[config->remaining_hosts - 1] = tmp;
+
+    /* shorten the candidate list so we don't try the same server twice */
+    config->remaining_hosts--;
+    return server;
+}
+
+
+/**
+ * Strip leading/trailing whitespace from a string
+ */
+static char *trim(char *string) {
+    if (string == NULL || strlen(string) == 0)
+        return string;
+
+    char *left = string;
+    char *right = string + strlen(string) - 1;
+
+    while (left && *left && isspace(*left))
+        left++;
+    while (right > left && right && *right && isspace(*right))
+        right--;
+    right++;
+    *right = '\0';
+    return left;
+}
+
+/**
+ * Check return of a rabbitmq-c call and throw an error + clean up if it is a
+ * failure
+ */
+static int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die) {
+    amqp_connection_close_t *conn_close_reply;
+    amqp_channel_close_t *chan_close_reply;
+    switch (x.reply_type) {
+    case AMQP_RESPONSE_NORMAL:
+        return 0;
+
+    case AMQP_RESPONSE_NONE:
+        fprintf(stderr, "%s: missing RPC reply type!\n", context);
+        break;
+
+    case AMQP_RESPONSE_LIBRARY_EXCEPTION:
+        fprintf(stderr, "%s: %s\n", context, amqp_error_string2(x.library_error));
+        break;
+
+    case AMQP_RESPONSE_SERVER_EXCEPTION:
+        switch (x.reply.id) {
+            case AMQP_CONNECTION_CLOSE_METHOD:
+                conn_close_reply = (amqp_connection_close_t *) x.reply.decoded;
+                fprintf(stderr, "%s: server connection error %d, message: %.*s\n",
+                    context,
+                    conn_close_reply->reply_code,
+                    (int)conn_close_reply->reply_text.len, (char *)conn_close_reply->reply_text.bytes);
+                break;
+            case AMQP_CHANNEL_CLOSE_METHOD:
+                chan_close_reply = (amqp_channel_close_t *) x.reply.decoded;
+                fprintf(stderr, "%s: server channel error %d, message: %.*s\n",
+                    context,
+                    chan_close_reply->reply_code,
+                    (int)chan_close_reply->reply_text.len, (char *)chan_close_reply->reply_text.bytes);
+                break;
+            default:
+                fprintf(stderr, "%s: unknown server error, method id 0x%08X\n", context, x.reply.id);
+                break;
+        }
+        break;
+    }
+    if ( die )
+        exit(1);
+    else
+        return 1;
+}
+
+/**
+ *  Convert a hoover_header into an AMQP table to be attached to a message
+ */
+#define HOOVER_HEADER_ENTRIES 6 /* number of elements in struct hoover_header */
+static amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
+    amqp_table_t *table;
+    amqp_table_entry_t *entries;
+
+    if ( !(table = malloc(sizeof(*table))) )
+        return NULL;
+    if ( !(entries = malloc(HOOVER_HEADER_ENTRIES * sizeof(*entries))) ) {
+        free(table);
+        return NULL;
+    }
+
+    table->num_entries = HOOVER_HEADER_ENTRIES;
+
+    /* Set headers */
+    entries[0].key = amqp_cstring_bytes("filename");
+    entries[0].value.kind = AMQP_FIELD_KIND_UTF8;
+    entries[0].value.value.bytes = amqp_cstring_bytes(header->filename);
+
+    entries[1].key = amqp_cstring_bytes("node_id");
+    entries[1].value.kind = AMQP_FIELD_KIND_UTF8;
+    entries[1].value.value.bytes = amqp_cstring_bytes(header->node_id);
+
+    entries[2].key = amqp_cstring_bytes("task_id");
+    entries[2].value.kind = AMQP_FIELD_KIND_UTF8;
+    entries[2].value.value.bytes = amqp_cstring_bytes(header->task_id);
+
+    entries[3].key = amqp_cstring_bytes("compression");
+    entries[3].value.kind = AMQP_FIELD_KIND_UTF8;
+    entries[3].value.value.bytes = amqp_cstring_bytes(header->compression);
+
+    entries[4].key = amqp_cstring_bytes("sha_hash");
+    entries[4].value.kind = AMQP_FIELD_KIND_UTF8;
+    entries[4].value.value.bytes = amqp_cstring_bytes((char*)header->sha_hash);
+
+    entries[5].key = amqp_cstring_bytes("size");
+    entries[5].value.kind = AMQP_FIELD_KIND_I64;
+    entries[5].value.value.i64 = header->size;
+
+    table->entries = entries;
+
+    return table;
+}
+
+/**
+ * Destroy amqp_table_t and all entries
+ */
+static void free_amqp_header_table( amqp_table_t *table ) {
+    int i;
+    for ( i = 0; i < table->num_entries; i++ )
+        free(&(table->entries[i]));
+    free(table);
+    return;
+}
+
+/*******************************************************************************
+ * Global functions
+ ******************************************************************************/
+
+/**
  *  Load RabbitMQ configuration parameters
  */
-struct hoover_tube_config *read_tube_config() {
+struct hoover_tube_config *read_tube_config(void) {
     FILE *fp = fopen(HOOVER_CONFIG_FILE, "r");
     if (fp == NULL) return NULL;
 
@@ -108,8 +259,10 @@ struct hoover_tube_config *read_tube_config() {
     return config;
 }
 
-/*
- * Save RabbitMQ configuration parameters
+/**
+ *  Save RabbitMQ configuration parameters in some serialized format.  Ideally
+ *  the output of this function can serve as the input of the read_tube_config()
+ *  function.
  */
 void save_tube_config(struct hoover_tube_config *config, FILE *out) {
     if (config == NULL || out == NULL) return;
@@ -129,190 +282,43 @@ void save_tube_config(struct hoover_tube_config *config, FILE *out) {
     fprintf(out, "routing_key: %s\n", config->routing_key);
     fprintf(out, "max_transmit_size: %lu\n", config->max_transmit_size);
     fprintf(out, "use_ssl: %d\n", config->use_ssl);
-}
-
-/*
- * Strip leading/trailing whitespace from a string
- */
-char *trim(char *string) {
-    if (string == NULL || strlen(string) == 0)
-        return string;
-
-    char *left = string;
-    char *right = string + strlen(string) - 1;
-
-    while (left && *left && isspace(*left))
-        left++;
-    while (right > left && right && *right && isspace(*right))
-        right--;
-    right++;
-    *right = '\0';
-    return left;
-}
-
-
-/*
- * Check return of a rabbitmq-c call and throw an error + clean up if it is a
- * failure
- */
-int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die) {
-    amqp_connection_close_t *conn_close_reply;
-    amqp_channel_close_t *chan_close_reply;
-    switch (x.reply_type) {
-    case AMQP_RESPONSE_NORMAL:
-        return 0;
-
-    case AMQP_RESPONSE_NONE:
-        fprintf(stderr, "%s: missing RPC reply type!\n", context);
-        break;
-
-    case AMQP_RESPONSE_LIBRARY_EXCEPTION:
-        fprintf(stderr, "%s: %s\n", context, amqp_error_string2(x.library_error));
-        break;
-
-    case AMQP_RESPONSE_SERVER_EXCEPTION:
-        switch (x.reply.id) {
-            case AMQP_CONNECTION_CLOSE_METHOD:
-                conn_close_reply = (amqp_connection_close_t *) x.reply.decoded;
-                fprintf(stderr, "%s: server connection error %d, message: %.*s\n",
-                    context,
-                    conn_close_reply->reply_code,
-                    (int)conn_close_reply->reply_text.len, (char *)conn_close_reply->reply_text.bytes);
-                break;
-            case AMQP_CHANNEL_CLOSE_METHOD:
-                chan_close_reply = (amqp_channel_close_t *) x.reply.decoded;
-                fprintf(stderr, "%s: server channel error %d, message: %.*s\n",
-                    context,
-                    chan_close_reply->reply_code,
-                    (int)chan_close_reply->reply_text.len, (char *)chan_close_reply->reply_text.bytes);
-                break;
-            default:
-                fprintf(stderr, "%s: unknown server error, method id 0x%08X\n", context, x.reply.id);
-                break;
-        }
-        break;
-    }
-    if ( die )
-        exit(1);
-    else
-        return 1;
-}
-
-/*
- *  Randomly select a server from the list of servers, then pop it off the list
- */
-char *select_server(struct hoover_tube_config *config) {
-    if (config->remaining_hosts == 0 || config->max_hosts == 0) return NULL;
-
-    size_t idx;
-    char *server, *tmp;
-
-    idx = rand() % config->max_hosts;
-    server = config->servers[idx];
-
-    /* swap last element with selected element */
-    tmp = config->servers[idx];
-    config->servers[idx] = config->servers[config->remaining_hosts - 1];
-    config->servers[config->remaining_hosts - 1] = tmp;
-
-    /* shorten the candidate list so we don't try the same server twice */
-    config->remaining_hosts--;
-    return server;
-}
-
-
-/* 
- *  Convert a hoover_header into an AMQP table to be attached to a message
- */
-#define HOOVER_HEADER_ENTRIES 6 /* number of elements in struct hoover_header */
-amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
-    amqp_table_t *table;
-    amqp_table_entry_t *entries;
-
-    if ( !(table = malloc(sizeof(*table))) )
-        return NULL;
-    if ( !(entries = malloc(HOOVER_HEADER_ENTRIES * sizeof(*entries))) ) {
-        free(table);
-        return NULL;
-    }
-
-    table->num_entries = HOOVER_HEADER_ENTRIES;
-
-    /* Set headers */
-    entries[0].key = amqp_cstring_bytes("filename");
-    entries[0].value.kind = AMQP_FIELD_KIND_UTF8;
-    entries[0].value.value.bytes = amqp_cstring_bytes(header->filename);
-
-    entries[1].key = amqp_cstring_bytes("node_id");
-    entries[1].value.kind = AMQP_FIELD_KIND_UTF8;
-    entries[1].value.value.bytes = amqp_cstring_bytes(header->node_id);
-
-    entries[2].key = amqp_cstring_bytes("task_id");
-    entries[2].value.kind = AMQP_FIELD_KIND_UTF8;
-    entries[2].value.value.bytes = amqp_cstring_bytes(header->task_id);
-
-    entries[3].key = amqp_cstring_bytes("compression");
-    entries[3].value.kind = AMQP_FIELD_KIND_UTF8;
-    entries[3].value.value.bytes = amqp_cstring_bytes(header->compression);
-
-    entries[4].key = amqp_cstring_bytes("sha_hash");
-    entries[4].value.kind = AMQP_FIELD_KIND_UTF8;
-    entries[4].value.value.bytes = amqp_cstring_bytes((char*)header->sha_hash);
-
-    entries[5].key = amqp_cstring_bytes("size");
-    entries[5].value.kind = AMQP_FIELD_KIND_I64;
-    entries[5].value.value.i64 = header->size;
-
-    table->entries = entries;
-
-    return table;
-}
-
-
-/*
- * Convert a bunch of runtime structures into an AMQP message and send it
- */
-void hoover_send_message( struct hoover_tube *tube,
-                          struct hoover_data_obj *hdo,
-                          struct hoover_header *header ) {
-    amqp_rpc_reply_t reply;
-    amqp_basic_properties_t props;
-    amqp_table_t *table;
-    amqp_bytes_t body;
-
-    /* convert HDO to amqp_bytes_t */
-    body.len = hdo->size;
-    body.bytes = hdo->data;
-
-    /* create the amqp_table that contains the header metadata */
-    table = create_amqp_header_table( header );
-
-    /* TODO: figure out what these flags mean */
-    memset( &props, 0, sizeof(props) );
-    props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG | AMQP_BASIC_HEADERS_FLAG;
-    props.delivery_mode = 2; /* 1 or 2? */
-    props.headers = *table;
-
-    /* Send the actual AMQP message */
-    amqp_basic_publish(
-        tube->connection,   /* amqp_connection_state_t state */
-        tube->channel,      /* amqp_channel_t channel */
-        tube->exchange,     /* amqp_bytes_t exchange */
-        tube->routing_key,  /* amqp_bytes_t routing_key */
-        0,                  /* amqp_boolean_t mandatory */
-        0,                  /* amqp_boolean_t immediate */
-        &props,             /* amqp_basic_properties_t *properties */
-        body                /* amqp_bytes_t body */
-    );
-
-    free_amqp_header_table(table);
-
-    reply = amqp_get_rpc_reply(tube->connection);
-    parse_amqp_response(reply, "publish message", true);
 
     return;
 }
 
+/**
+ * Destroy hoover_tube_config and free all strings
+ *
+ * Note that you MUST destroy all tubes that rely on a config before freeing
+ * that config with this function.  Tubes alias the 'exchange' and 'routing_key'
+ * members which are freed here.
+ */
+void free_tube_config( struct hoover_tube_config *config ) {
+    int i;
+    if (config == NULL) {
+        fprintf( stderr, "free_tube_config: received NULL pointer\n" );
+        return;
+    }
+
+    for (i = 0; i < config->max_hosts; i++)
+        if (config->servers[i] != NULL)
+            free(config->servers[i]);
+
+    if (config->vhost         != NULL) free(config->vhost);
+    if (config->username      != NULL) free(config->username);
+    if (config->password      != NULL) free(config->password);
+    if (config->exchange      != NULL) free(config->exchange);    /* note that hoover_tube aliases this string */
+    if (config->exchange_type != NULL) free(config->exchange_type);
+    if (config->queue         != NULL) free(config->queue);
+    if (config->routing_key   != NULL) free(config->routing_key); /* note that hoover_tube aliases this string */
+
+    free(config);
+    return;
+}
+
+/**
+ *  Create a tube and get to a state where it can be used to send HDOs
+ */
 struct hoover_tube *create_hoover_tube(struct hoover_tube_config *config) {
     int connected, status;
     char *hostname;
@@ -412,48 +418,7 @@ struct hoover_tube *create_hoover_tube(struct hoover_tube_config *config) {
     return tube;
 }
 
-/*
- * Destroy hoover_tube_config and free all strings
- *
- * Note that you MUST destroy all tubes that rely on a config before freeing
- * that config with this function.  Tubes alias the 'exchange' and 'routing_key'
- * members which are freed here.
- */
-void free_tube_config( struct hoover_tube_config *config ) {
-    int i;
-    if (config == NULL) {
-        fprintf( stderr, "free_tube_config: received NULL pointer\n" );
-        return;
-    }
-
-    for (i = 0; i < config->max_hosts; i++)
-        if (config->servers[i] != NULL)
-            free(config->servers[i]);
-
-    if (config->vhost         != NULL) free(config->vhost);
-    if (config->username      != NULL) free(config->username);
-    if (config->password      != NULL) free(config->password);
-    if (config->exchange      != NULL) free(config->exchange);    /* note that hoover_tube aliases this string */
-    if (config->exchange_type != NULL) free(config->exchange_type);
-    if (config->queue         != NULL) free(config->queue);
-    if (config->routing_key   != NULL) free(config->routing_key); /* note that hoover_tube aliases this string */
-
-    free(config);
-    return;
-}
-
-/*
- * Destroy amqp_table_t and all entries
- */
-void free_amqp_header_table( amqp_table_t *table ) {
-    int i;
-    for ( i = 0; i < table->num_entries; i++ )
-        free(&(table->entries[i]));
-    free(table);
-    return;
-}
-
-/*
+/**
  * Destroy a hoover tube and all substructures.
  *
  * Note that semantics are a little different in that this function not only
@@ -473,5 +438,49 @@ void free_hoover_tube( struct hoover_tube *tube ) {
     }
 
     free(tube);
+    return;
+}
+
+/**
+ * Convert Hoover structures into an AMQP message and send it
+ */
+void hoover_send_message( struct hoover_tube *tube,
+                          struct hoover_data_obj *hdo,
+                          struct hoover_header *header ) {
+    amqp_rpc_reply_t reply;
+    amqp_basic_properties_t props;
+    amqp_table_t *table;
+    amqp_bytes_t body;
+
+    /* convert HDO to amqp_bytes_t */
+    body.len = hdo->size;
+    body.bytes = hdo->data;
+
+    /* create the amqp_table that contains the header metadata */
+    table = create_amqp_header_table( header );
+
+    /* TODO: figure out what these flags mean */
+    memset( &props, 0, sizeof(props) );
+    props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG | AMQP_BASIC_HEADERS_FLAG;
+    props.delivery_mode = 2; /* 1 or 2? */
+    props.headers = *table;
+
+    /* Send the actual AMQP message */
+    amqp_basic_publish(
+        tube->connection,   /* amqp_connection_state_t state */
+        tube->channel,      /* amqp_channel_t channel */
+        tube->exchange,     /* amqp_bytes_t exchange */
+        tube->routing_key,  /* amqp_bytes_t routing_key */
+        0,                  /* amqp_boolean_t mandatory */
+        0,                  /* amqp_boolean_t immediate */
+        &props,             /* amqp_basic_properties_t *properties */
+        body                /* amqp_bytes_t body */
+    );
+
+    free_amqp_header_table(table);
+
+    reply = amqp_get_rpc_reply(tube->connection);
+    parse_amqp_response(reply, "publish message", true);
+
     return;
 }
