@@ -5,6 +5,7 @@ available at
 
 http://pika.readthedocs.io/en/0.10.0/examples/asynchronous_consumer_example.html
 """
+import os
 import sys
 import random
 import json
@@ -13,10 +14,18 @@ import logging
 import pika
 import urllib # for urllib.quote
 
+import hoover
+import StringIO
+
 _DEFAULT_CONFIG_FILE = '/etc/opt/nersc/slurmd_log_rotate_mq.conf'
 _DEFAULT_CONFIG_FILE = 'amqpcreds.conf'
 _AMQP_URI_TEMPLATE = "amqp%(ssl)s://%(username)s:%(password)s@%(server)s:%(port)s/%(vhost)s"
 _MAX_RECONNECT_DELAY = 10.0 * 60.0
+_HOOVER_TYPE_OUTDIR_MAP = {
+    "darshan":  "darshanlogs",
+    "manifest": "manifests",
+    "_default": "misc",
+}
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,13 +64,20 @@ class HooverConsumer(object):
             self.exchange_type = config['exchange_type']
             self.queue = config['queue']
             self.routing_key = config['routing_key']
-            if config['use_ssl'] == 0:
-                self.ssl = False
-            else:
-                self.ssl = True
             self.max_transmit = config['max_transmit_size']
         except KeyError:
             raise Exception("incomplete/malformed config file")
+
+        ### Optional public attributes
+        self.ssl = False
+        if 'use_ssl' in config and config['use_ssl'] != 0:
+            self.ssl = True
+        self.output_dir = os.getcwd()
+        if 'output_dir' in config:
+            self.output_dir = config['output_dir']
+        self.type_outdir_map = _HOOVER_TYPE_OUTDIR_MAP
+        if 'type_outdir_map' in config:
+            self.type_outdir_map = config['type_outdir_map']
 
         ### private attributes to describe rabbitmq state
         self._connection = None
@@ -275,11 +291,64 @@ class HooverConsumer(object):
         :param str|unicode body: The message body
 
         """
-        LOGGER.info('Received message # %s from %s: %s',
-                    basic_deliver.delivery_tag, properties.app_id, body)
+        LOGGER.info('Received message # %s from %s',
+                    basic_deliver.delivery_tag, properties.app_id )
 
-        LOGGER.info('Acknowledging message %s', basic_deliver.delivery_tag)
-        self._channel.basic_ack(basic_deliver.delivery_tag)
+        ### Figure out what to call this file
+        if properties.headers is None or 'sha_hash' not in properties.headers:
+            ### Messages without checksums at all are useless to us; discard
+            LOGGER.error("No checksum provided in message header:\n%s" %
+                json.dumps(properties.headers))
+            return
+        elif 'filename' not in properties.headers:
+            ### No filename with checksum indicates a manifest being sent.
+            ### Key manifests their expected contents so that if a manifest
+            ### has to be re-sent, it is not duplicated on the consumer side
+            output_file = os.path.basename('manifest_%s.json' % properties.headers['sha_hash'])
+        else:
+            ### Actual files have intended file names embedded
+            output_file = os.path.basename(properties.headers['filename'])
+
+        ### Figure out where to put this file.  If the global config is an
+        ### absolute path, we use that and disregard output_dir entirely;
+        ### otherwise, we take output_dir as a base then tack on the globally
+        ### configured dir
+        if 'type' not in properties.headers:
+            parent_dir = ""
+        elif properties.headers['type'] not in self.type_outdir_map:
+            parent_dir = self.type_outdir_map['_default']
+        else:
+            parent_dir = self.type_outdir_map[properties.headers['type']]
+
+        if not parent_dir.startswith(os.sep):
+            parent_dir = os.path.join(self.output_dir, parent_dir)
+
+        output_file = os.path.join(parent_dir, output_file)
+
+        ### Start interacting with the system and keep an eye out for exceptions
+        try: 
+            if not os.path.isdir(parent_dir):
+                LOGGER.info("Creating output dir [%s]" % parent_dir)
+                os.makedirs(parent_dir)
+
+            ### Write the message body into the intended file
+            open( output_file, 'w+' ).write(body)
+        except:
+            LOGGER.error('Unexpected error: %s' % str(sys.exc_info()))
+            self._channel.basic_nack(basic_deliver.delivery_tag)
+
+        ### Calculate checksum and compare to manifest
+        checksum = hoover.checksum( StringIO.StringIO(body) )
+        if checksum == properties.headers['sha_hash']:
+            LOGGER.info("Wrote output to %s (cksum: %s)" % (output_file, checksum))
+            LOGGER.info('Acknowledging message %s', basic_deliver.delivery_tag)
+            self._channel.basic_ack(basic_deliver.delivery_tag)
+        else:
+            LOGGER.error("Checksum mismatch for %s (cksum: %s, was expecting %s)" % 
+                (output_file, checksum, properties.headers['sha_hash']))
+            ### We assume that sha mismatch occurred on the network (unlikely)
+            ### or at this client (e.g., out of space).
+            self._channel.basic_nack(basic_deliver.delivery_tag)
 
     def stop_consuming(self):
         """Tell RabbitMQ that you would like to stop consuming by sending the
@@ -357,13 +426,15 @@ def _read_config(filename):
             (key,value) = (x.strip() for x in line.split('=', 1))
             if key == 'servers':
                 value = [x.strip() for x in value.split(',')]
-            if key == 'port':
+            elif key == 'port':
                 value = int(value)
-            if key == 'use_ssl':
+            elif key == 'use_ssl':
                 if int(value) != 0:
                     value = True
                 else:
                     value = False
+            elif key == 'type_outdir_map':
+                value = json.reads(value)
             config[key] = value
     return config
 
