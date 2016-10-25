@@ -169,9 +169,7 @@ static amqp_table_t *create_amqp_header_table( struct hoover_header *header ) {
  * Destroy amqp_table_t and all entries
  */
 static void free_amqp_header_table( amqp_table_t *table ) {
-    int i;
-    for ( i = 0; i < table->num_entries; i++ )
-        free(&(table->entries[i]));
+    free(table->entries);
     free(table);
     return;
 }
