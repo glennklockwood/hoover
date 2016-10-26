@@ -325,10 +325,16 @@ class HooverConsumer(object):
 
         output_file = os.path.join(parent_dir, output_file)
 
+        if os.path.isdir(output_file):
+            LOGGER.error("Target output %s exists but is a dir" % output_file)
+            return
+        elif os.path.exists(output_file):
+            LOGGER.warning("Target output %s exists; overwriting" % output_file)
+
         ### Start interacting with the system and keep an eye out for exceptions
         try: 
             if not os.path.isdir(parent_dir):
-                LOGGER.info("Creating output dir [%s]" % parent_dir)
+                LOGGER.info("Creating output dir %s" % parent_dir)
                 os.makedirs(parent_dir)
 
             ### Write the message body into the intended file
