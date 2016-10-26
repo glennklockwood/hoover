@@ -20,6 +20,10 @@
 #include "hooverio.h"
 #include "hooverrmq.h"
 
+#ifndef HOOVER_APP_ID
+    #define HOOVER_APP_ID "hoover-producer"
+#endif
+
 /*******************************************************************************
  *  Private functions
  ******************************************************************************/
@@ -463,9 +467,12 @@ void hoover_send_message( struct hoover_tube *tube,
 
     /* TODO: figure out what these flags mean */
     memset( &props, 0, sizeof(props) );
-    props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG | AMQP_BASIC_HEADERS_FLAG;
+    props._flags = AMQP_BASIC_DELIVERY_MODE_FLAG | \
+                   AMQP_BASIC_HEADERS_FLAG | \
+                   AMQP_BASIC_APP_ID_FLAG;
     props.delivery_mode = 2; /* 1 or 2? */
     props.headers = *table;
+    props.app_id = amqp_cstring_bytes(HOOVER_APP_ID);
 
     /* Send the actual AMQP message */
     amqp_basic_publish(

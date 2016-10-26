@@ -10,8 +10,9 @@ OBJECTS=producer producer-file test-hdo test-manifest
 
 all: $(OBJECTS)
 
+producer: CFLAGS += -DHOOVER_APP_ID=\"hoover-producer-cli\"
 producer: producer.c hooverio.o hooverrmq.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lrabbitmq -lssl -lcrypto -lz
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lrabbitmq -lssl -lcrypto -lz 
 
 hooverrmq.o: hooverrmq.c hooverrmq.h
 	$(CC) $(CPPFLAGS) -DHOOVER_CONFIG_FILE=\"amqpcreds.conf\"  $(CFLAGS) -c $<
