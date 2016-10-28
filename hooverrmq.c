@@ -29,7 +29,7 @@
  ******************************************************************************/
 static int parse_amqp_response(amqp_rpc_reply_t x, char const *context, int die);
 static char *trim(char *string);
-static char *select_server(struct hoover_tube_config *config);
+char *select_server(struct hoover_tube_config *config);
 static amqp_table_t *create_amqp_header_table( struct hoover_header *header );
 static void free_amqp_header_table( amqp_table_t *table );
 
@@ -42,8 +42,7 @@ char *select_server(struct hoover_tube_config *config) {
     size_t idx;
     char *server, *tmp;
 
-    idx = rand() % config->max_hosts;
-    server = config->servers[idx];
+    idx = rand() % config->remaining_hosts;
 
     /* swap last element with selected element */
     tmp = config->servers[idx];
@@ -52,7 +51,7 @@ char *select_server(struct hoover_tube_config *config) {
 
     /* shorten the candidate list so we don't try the same server twice */
     config->remaining_hosts--;
-    return server;
+    return tmp;
 }
 
 

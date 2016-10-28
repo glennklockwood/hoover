@@ -1,3 +1,5 @@
+#pragma once 
+
 #ifndef __USE_POSIX
     #define __USE_POSIX
 #endif

@@ -6,7 +6,7 @@ OTHER_PKGS_DIR=/opt/local
 CFLAGS=-I$(RMQ_C_DIR)/include -I$(OTHER_PKGS_DIR)/include -Wno-deprecated-declarations -g -std=c99
 LDFLAGS=-L$(RMQ_C_DIR)/lib -L$(OTHER_PKGS_DIR)/lib -Bstatic
 
-OBJECTS=producer producer-file test-hdo test-manifest
+OBJECTS=producer producer-file test-hdo test-manifest test-select-server
 
 all: $(OBJECTS)
 
@@ -31,6 +31,9 @@ test-hdo: test-hdo.c hooverio.o hooverfile.o
 
 test-manifest: test-manifest.c hooverio.o hooverfile.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto -lz
+
+test-select-server: test-select-server.c hooverrmq.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto -lz -lrabbitmq
 
 clean:
 	-rm *.o $(OBJECTS)

@@ -2,6 +2,7 @@ producer
 producer-file
 test-hdo
 test-manifest
+test-select-server
 *.dSYM
 *.o
 *.pyc

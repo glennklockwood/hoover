@@ -2,6 +2,8 @@
 #include <amqp_tcp_socket.h>
 #include <amqp_framing.h>
 
+#include "hooverio.h"
+
 #ifndef HOOVER_MAX_SERVERS
 #define HOOVER_MAX_SERVERS 256
 #endif
